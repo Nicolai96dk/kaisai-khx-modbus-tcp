@@ -1,0 +1,193 @@
+{
+  "title": "Kaisai KHX Modbus TCP",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to a KAISAI KHX",
+        "description": "Enter the Modbus TCP connection. Setup performs only a safe read before profile selection.",
+        "data": {"host": "Host", "port": "Port", "unit_id": "Unit ID", "name": "Device name"}
+      },
+      "profile": {
+        "title": "Choose your model",
+        "description": "Choose the exact model when known, the generic KHX R290 profile for another variant, or Custom for guided editing.",
+        "data": {"profile": "Model profile"}
+      },
+      "custom_base": {
+        "title": "Choose a profile to customize",
+        "description": "The selected built-in profile is cloned. Built-in profiles themselves are never changed.",
+        "data": {"base_profile": "Starting profile"}
+      },
+      "reconfigure": {
+        "title": "Reconfigure KAISAI KHX",
+        "data": {"host": "Host", "port": "Port", "unit_id": "Unit ID", "name": "Device name", "profile": "Model profile"}
+      },
+      "advanced_setup": {
+        "title": "Custom profile",
+        "description": "Settings are grouped by purpose. Model capabilities are descriptive and never authorize Modbus writes.",
+        "menu_options": {
+          "advanced_capabilities": "Device capabilities",
+          "advanced_communication": "Communication and polling",
+          "advanced_addresses": "Register mapping",
+          "advanced_register": "Register decoding",
+          "advanced_climate": "Climate settings",
+          "advanced_finish": "Review and finish"
+        }
+      },
+      "advanced_capabilities": {
+        "title": "Device capabilities",
+        "description": "Use 0 for an unknown fan count. These values control applicability and entity creation only; they cannot cause a write.",
+        "data": {
+          "dhw_enabled": "Enable domestic hot water support",
+          "electrical_phase": "Electrical phase",
+          "fan_count": "Physical fan count (0 = unknown)",
+          "fan_2_enabled": "Supports second fan",
+          "enable_fault_monitoring": "Enable fault monitoring"
+        }
+      },
+      "advanced_communication": {
+        "title": "Communication and polling",
+        "data": {"scan_interval": "Polling interval", "timeout": "Connection timeout", "message_spacing": "Minimum time between Modbus messages"},
+        "data_description": {"scan_interval": "Seconds between polls (5–300).", "message_spacing": "Seconds; use only when required by the gateway."}
+      },
+      "advanced_addresses": {
+        "title": "Register addresses",
+        "description": "Changing an address creates an entry-local Custom profile. It never grants write permission to a new semantic function.",
+        "data": {
+          "address_power": "Power command",
+          "address_mode": "Operating mode",
+          "address_dhw_target_temperature": "DHW target temperature",
+          "address_heating_target_temperature": "Heating target temperature",
+          "address_cooling_target_temperature": "Cooling target temperature",
+          "address_maximum_water_outlet_temperature": "Maximum configured water outlet temperature",
+          "address_power_state": "Actual power state",
+          "address_operation_status": "Operating status",
+          "address_calculated_temperature": "Calculated current temperature",
+          "address_compensated_temperature": "Compensated current temperature",
+          "address_output_states": "Output states",
+          "address_input_states": "Input states",
+          "address_water_inlet_temperature": "Water inlet temperature",
+          "address_water_outlet_temperature": "Water outlet temperature",
+          "address_water_tank_temperature": "Water tank temperature",
+          "address_ambient_temperature": "Ambient temperature",
+          "address_compressor_frequency": "Compressor frequency",
+          "address_fan_1_speed": "Fan 1 speed",
+          "address_fan_2_speed": "Fan 2 speed",
+          "address_fault_2081": "Fault register 2081",
+          "address_fault_2082": "Fault register 2082",
+          "address_fault_2083": "Fault register 2083",
+          "address_fault_2085": "Fault register 2085",
+          "address_fault_2086": "Fault register 2086",
+          "address_fault_2087": "Repeated fault register 2087",
+          "address_fault_2088": "Repeated fault register 2088",
+          "address_fault_2089": "Sensor fault register 2089",
+          "address_fault_2090": "Fault register 2090"
+        }
+      },
+      "advanced_register": {
+        "title": "Choose a register",
+        "description": "Select one known register to edit its address-independent decoding metadata.",
+        "data": {"register": "Register"}
+      },
+      "advanced_register_details": {
+        "title": "Register decoding",
+        "description": "Editing {register}. Write authorization is hard-coded and cannot be changed here.",
+        "data": {
+          "register_type": "Register type",
+          "data_type": "KAISAI data type",
+          "scale": "Additional scale multiplier",
+          "offset": "Offset",
+          "precision": "Precision (-1 for automatic)",
+          "minimum": "Profile minimum (-32768 for none)",
+          "maximum": "Profile maximum (65535 for none)",
+          "step": "Step (0 for none)",
+          "poll_interval": "Polling override in seconds (0 for global)",
+          "enum_mapping": "Enum mapping (JSON)",
+          "sentinel_values": "Invalid values (comma-separated)"
+        }
+      },
+      "advanced_climate": {
+        "title": "Climate settings",
+        "description": "Profile ranges remain subject to the integration's hard safety limits.",
+        "data": {
+          "current_temperature_register": "Current temperature source",
+          "heating_minimum": "Heating minimum temperature",
+          "heating_maximum": "Heating maximum temperature",
+          "heating_step": "Heating temperature step",
+          "cooling_minimum": "Cooling minimum temperature",
+          "cooling_maximum": "Cooling maximum temperature",
+          "cooling_step": "Cooling temperature step"
+        }
+      },
+      "advanced_finish": {
+        "title": "Review advanced setup",
+        "description": "Active profile: {profile}. Registers with customized metadata: {changes}. Submit to add the device."
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to communicate with the selected Modbus device.",
+      "invalid_profile": "The register configuration is invalid or attempts to change write authorization.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Modbus unit is already configured.",
+      "unique_id_mismatch": "The device identity does not match the existing entry.",
+      "reconfigure_successful": "The device was reconfigured successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "KAISAI KHX settings",
+        "menu_options": {"general": "General settings", "capabilities": "Custom capabilities", "climate": "Climate settings", "advanced_registers": "Advanced register overrides", "test_register": "Read-only register test", "validate_profile": "Validate profile"}
+      },
+      "general": {
+        "title": "General settings",
+        "data": {"scan_interval": "Polling interval", "dhw_enabled": "Enable domestic hot water support", "fan_2_enabled": "Enable second fan", "timeout": "Connection timeout", "message_spacing": "Minimum time between Modbus messages"}
+      },
+      "capabilities": {
+        "title": "Custom profile capabilities",
+        "description": "Descriptive applicability settings only. They never authorize a Modbus write.",
+        "data": {"electrical_phase": "Electrical phase", "fan_count": "Physical fan count (0 = unknown)", "fan_2_enabled": "Supports second fan", "enable_fault_monitoring": "Enable fault monitoring"}
+      },
+      "climate": {"title": "Climate settings", "data": {"current_temperature_register": "Current temperature source"}},
+      "advanced_registers": {
+        "title": "Advanced register overrides",
+        "description": "JSON keyed by known register name. Writable status cannot be changed and arbitrary controls cannot be created.",
+        "data": {"custom_registers": "Register overrides"}
+      },
+      "test_register": {
+        "title": "Read-only register test",
+        "description": "{result}",
+        "data": {"address": "Address", "register_type": "Register type", "data_type": "Data type", "scale": "Additional scale multiplier"}
+      },
+      "validate_profile": {"title": "Validate profile", "description": "{results}"}
+    },
+    "error": {"invalid_profile": "The register override JSON is invalid or unsafe.", "register_test_failed": "The register read failed."}
+  },
+  "entity": {
+    "climate": {"climate": {"name": "Climate"}},
+    "switch": {"power": {"name": "Power"}},
+    "select": {"operating_mode": {"name": "Operating mode"}},
+    "number": {"dhw_target_temperature": {"name": "Domestic hot water target temperature"}},
+    "binary_sensor": {"fault": {"name": "Fault"}},
+    "sensor": {
+      "water_inlet_temperature": {"name": "Water inlet temperature"},
+      "water_outlet_temperature": {"name": "Water outlet temperature"},
+      "water_tank_temperature": {"name": "Water tank temperature"},
+      "ambient_temperature": {"name": "Ambient temperature"},
+      "compressor_frequency": {"name": "Compressor frequency"},
+      "operation_status": {"name": "Operating status", "state": {"cooling": "Cooling", "heating": "Heating", "defrosting": "Defrosting", "high_temperature_disinfection": "High temperature disinfection", "hot_water": "Hot water"}},
+      "calculated_temperature": {"name": "Calculated current temperature"},
+      "compensated_temperature": {"name": "Compensated current temperature"},
+      "fan_1_speed": {"name": "Fan 1 speed"},
+      "fan_2_speed": {"name": "Fan 2 speed"},
+      "maximum_water_outlet_temperature": {"name": "Maximum configured water outlet temperature"},
+      "active_fault": {"name": "Active fault"},
+      "unit_id": {"name": "Unit ID"},
+      "active_profile": {"name": "Active profile"},
+      "last_successful_update": {"name": "Last successful update"},
+      "failed_poll_count": {"name": "Failed poll count"},
+      "target_temperature": {"name": "Target temperature"}
+    }
+  }
+}

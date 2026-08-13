@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build HACS release archive
+        working-directory: custom_components/kaisai_khx
+        run: zip -r ../../kaisai_khx.zip .
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          kaisai_khx.zip
+          --verify-tag
+          --generate-notes
+          --title "Kaisai KHX Modbus TCP ${GITHUB_REF_NAME}"

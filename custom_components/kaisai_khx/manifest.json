@@ -1,0 +1,13 @@
+{
+  "domain": "kaisai_khx",
+  "name": "Kaisai KHX Modbus TCP",
+  "codeowners": ["@Nicolai96dk"],
+  "config_flow": true,
+  "documentation": "https://github.com/Nicolai96dk/kaisai-khx-modbus-tcp",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Nicolai96dk/kaisai-khx-modbus-tcp/issues",
+  "loggers": ["modbus_connection", "pymodbus"],
+  "requirements": ["modbus-connection[pymodbus]==3.8.1"],
+  "version": "0.1.0"
+}
