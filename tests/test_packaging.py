@@ -27,6 +27,9 @@ def test_hacs_and_translation_metadata() -> None:
     assert "writable" not in strings["config"]["step"]["advanced_register_details"]["data"]
     assert "active_fault" in strings["entity"]["sensor"]
     assert "fault" in strings["entity"]["binary_sensor"]
+    assert (ROOT / "custom_components/kaisai_khx/brand/icon.png").is_file()
+    assert hacs["zip_release"] is True
+    assert hacs["filename"] == "kaisai_khx.zip"
 
 
 def test_entity_enablement_matches_safety_requirements() -> None:
