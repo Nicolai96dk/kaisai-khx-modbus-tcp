@@ -46,7 +46,7 @@ Home Assistant ── Modbus TCP / Ethernet ── RS485 gateway ── Modbus R
 
 For a manual installation, copy `custom_components/kaisai_khx` into Home Assistant's `custom_components` directory and restart.
 
-Setup asks for the gateway connection, one of the three exact models, and the features to enable. On the first screen, **Gateway host/IP** is the address of the external RS485 gateway—not an address belonging to the heat pump. The port is the gateway's Modbus TCP listening port, normally `502`, and Unit ID is the KHX Modbus RTU slave address, normally `1`. Setup then offers only two advanced choices: polling interval and the climate entity's current-temperature source. The source can be water inlet, water outlet (default), or DHW tank temperature when DHW is enabled.
+Setup asks for the gateway connection, one of the three exact models, and the features to enable. On the first screen, **Gateway host/IP** is the address of the external RS485 gateway—not an address belonging to the heat pump. The port is the gateway's Modbus TCP listening port, normally `502`, and Unit ID is the KHX Modbus RTU slave address, normally `1`. Setup then offers two advanced choices: polling interval and the climate entity's current-temperature source. The source can be water inlet, water outlet (default), or DHW tank temperature when DHW is enabled.
 
 The feature page supports Heating, Cooling, optional DHW, monitoring-only operation, a separate power switch, actual power-state readback, fault monitoring, individual fault sensors, performance diagnostics, hardware input/output diagnostics, the read-only maximum outlet-temperature diagnostic, connection diagnostics, and **Debug diagnostics**. Debug diagnostics enables every applicable diagnostic entity for the selected model without expanding write access. Fan 2 remains model-controlled.
 
@@ -119,7 +119,7 @@ The internal decoder implements `TEMP`, `DIGI1`, `DIGI2`, `DIGI3`, `DIGI4`, `DIG
 
 ## Validation and troubleshooting
 
-The options flow is intentionally limited to polling interval and current-temperature source.
+The device's configuration dialog repeats the **Choose features** and **Advanced options** steps from initial setup. Saving reloads the integration, so features such as DHW and their related controls and sensors can be added or removed without deleting the device. The selected model is intentionally locked after setup; changing it requires removing the integration entry and setting it up again. **Reconfigure** can change only the gateway connection, Modbus unit ID, and device name.
 
 - Keep Modbus TCP on a trusted network; do not expose port 502 publicly.
 - Confirm whether another client is monopolizing a single-connection gateway.

@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/Nicolai96dk/kaisai-khx-modbus-tcp/issues",
   "loggers": ["modbus_connection", "pymodbus"],
   "requirements": ["modbus-connection[pymodbus]==3.8.1"],
-  "version": "0.2.3"
+  "version": "0.3.0"
 }

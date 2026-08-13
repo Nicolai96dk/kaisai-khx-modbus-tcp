@@ -56,8 +56,7 @@
           "host": "Gateway host/IP",
           "port": "Gateway TCP port",
           "unit_id": "KHX Modbus unit ID",
-          "name": "Device name",
-          "profile": "Model"
+          "name": "Device name"
         }
       }
     },
@@ -74,8 +73,31 @@
   "options": {
     "step": {
       "init": {
+        "title": "Choose features",
+        "description": "Enable or disable features after setup. Saving the next step reloads the integration and adds or removes the related entities. The selected model cannot be changed here.",
+        "data": {
+          "heating_enabled": "Heating",
+          "cooling_enabled": "Cooling",
+          "dhw_enabled": "Domestic hot water",
+          "control_enabled": "Allow control from Home Assistant",
+          "power_switch_enabled": "Separate power switch",
+          "power_state_readback_enabled": "Actual power-state readback",
+          "enable_fault_monitoring": "Fault monitoring",
+          "individual_fault_sensors_enabled": "Individual fault sensors",
+          "performance_diagnostics_enabled": "Performance diagnostics",
+          "io_diagnostics_enabled": "Hardware input/output diagnostics",
+          "max_outlet_diagnostic_enabled": "Maximum outlet-temperature diagnostic",
+          "connection_diagnostics_enabled": "Connection diagnostics",
+          "debug_diagnostics_enabled": "Debug diagnostics"
+        },
+        "data_description": {
+          "control_enabled": "Turn off for monitoring-only operation.",
+          "debug_diagnostics_enabled": "Overrides the individual diagnostic selections and enables all applicable diagnostic entities."
+        }
+      },
+      "advanced": {
         "title": "Advanced options",
-        "description": "DHW tank temperature is available only when Domestic hot water was enabled during setup.",
+        "description": "Choose the polling interval and which water temperature the climate entity uses as its current temperature. DHW tank temperature is available when Domestic hot water is enabled.",
         "data": {
           "scan_interval": "Polling interval",
           "current_temperature_register": "Current temperature source"

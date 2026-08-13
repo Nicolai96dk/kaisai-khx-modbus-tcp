@@ -63,6 +63,22 @@ PROFILE_OPTIONS = [
 ]
 SELECTABLE_PROFILE_IDS = {option["value"] for option in PROFILE_OPTIONS}
 
+FEATURE_DEFAULTS = {
+    CONF_HEATING: True,
+    CONF_COOLING: True,
+    CONF_DHW: False,
+    CONF_CONTROL: True,
+    CONF_POWER_SWITCH: False,
+    CONF_POWER_STATE_READBACK: True,
+    CONF_FAULT_MONITORING: True,
+    CONF_INDIVIDUAL_FAULTS: False,
+    CONF_PERFORMANCE_DIAGNOSTICS: True,
+    CONF_IO_DIAGNOSTICS: False,
+    CONF_MAX_OUTLET_DIAGNOSTIC: False,
+    CONF_CONNECTION_DIAGNOSTICS: True,
+    CONF_DEBUG_DIAGNOSTICS: False,
+}
+
 
 def _number_box(minimum: float, maximum: float, *, step: float | None = None) -> NumberSelector:
     """Create a boxed number selector."""
@@ -94,25 +110,52 @@ def _temperature_sources(dhw_enabled: bool) -> list[dict[str, str]]:
     return sources
 
 
-def connection_schema(defaults: dict[str, Any] | None = None, *, include_profile: bool = False) -> vol.Schema:
+def connection_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     """Build the connection form used by setup and reconfigure."""
     values = defaults or {}
-    schema: dict[Any, Any] = {
-        vol.Required(CONF_HOST, default=values.get(CONF_HOST, "")): TextSelector(),
-        vol.Required(CONF_PORT, default=values.get(CONF_PORT, DEFAULT_PORT)): vol.All(
-            _number_box(1, 65535), vol.Coerce(int)
-        ),
-        vol.Required(CONF_UNIT_ID, default=values.get(CONF_UNIT_ID, DEFAULT_UNIT_ID)): vol.All(
-            _number_box(1, 247), vol.Coerce(int)
-        ),
-        vol.Required(CONF_NAME, default=values.get(CONF_NAME, DEFAULT_NAME)): TextSelector(),
-    }
-    if include_profile:
-        selected = values.get(CONF_PROFILE, DEFAULT_PROFILE)
-        if selected not in SELECTABLE_PROFILE_IDS:
-            selected = DEFAULT_PROFILE
-        schema[vol.Required(CONF_PROFILE, default=selected)] = _profile_selector(selected)
-    return vol.Schema(schema)
+    return vol.Schema(
+        {
+            vol.Required(CONF_HOST, default=values.get(CONF_HOST, "")): TextSelector(),
+            vol.Required(CONF_PORT, default=values.get(CONF_PORT, DEFAULT_PORT)): vol.All(
+                _number_box(1, 65535), vol.Coerce(int)
+            ),
+            vol.Required(CONF_UNIT_ID, default=values.get(CONF_UNIT_ID, DEFAULT_UNIT_ID)): vol.All(
+                _number_box(1, 247), vol.Coerce(int)
+            ),
+            vol.Required(CONF_NAME, default=values.get(CONF_NAME, DEFAULT_NAME)): TextSelector(),
+        }
+    )
+
+
+def features_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    """Build the feature form for setup and post-setup options."""
+    values = defaults or {}
+    return vol.Schema(
+        {
+            vol.Required(key, default=values.get(key, default)): BooleanSelector()
+            for key, default in FEATURE_DEFAULTS.items()
+        }
+    )
+
+
+def advanced_schema(defaults: dict[str, Any], *, dhw_enabled: bool) -> vol.Schema:
+    """Build polling and current-temperature options."""
+    sources = _temperature_sources(dhw_enabled)
+    allowed_sources = {source["value"] for source in sources}
+    current_source = defaults.get(CONF_CURRENT_TEMP_KEY, DEFAULT_CURRENT_TEMP_KEY)
+    if current_source not in allowed_sources:
+        current_source = DEFAULT_CURRENT_TEMP_KEY
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_SCAN_INTERVAL,
+                default=defaults.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+            ): vol.All(_number_box(MIN_SCAN_INTERVAL, MAX_SCAN_INTERVAL), vol.Coerce(int)),
+            vol.Required(CONF_CURRENT_TEMP_KEY, default=current_source): SelectSelector(
+                SelectSelectorConfig(options=sources, mode=SelectSelectorMode.DROPDOWN)
+            ),
+        }
+    )
 
 
 async def validate_connection(data: dict[str, Any]) -> str | None:
@@ -182,23 +225,7 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_advanced()
         return self.async_show_form(
             step_id="features",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_HEATING, default=True): BooleanSelector(),
-                    vol.Required(CONF_COOLING, default=True): BooleanSelector(),
-                    vol.Required(CONF_DHW, default=False): BooleanSelector(),
-                    vol.Required(CONF_CONTROL, default=True): BooleanSelector(),
-                    vol.Required(CONF_POWER_SWITCH, default=False): BooleanSelector(),
-                    vol.Required(CONF_POWER_STATE_READBACK, default=True): BooleanSelector(),
-                    vol.Required(CONF_FAULT_MONITORING, default=True): BooleanSelector(),
-                    vol.Required(CONF_INDIVIDUAL_FAULTS, default=False): BooleanSelector(),
-                    vol.Required(CONF_PERFORMANCE_DIAGNOSTICS, default=True): BooleanSelector(),
-                    vol.Required(CONF_IO_DIAGNOSTICS, default=False): BooleanSelector(),
-                    vol.Required(CONF_MAX_OUTLET_DIAGNOSTIC, default=False): BooleanSelector(),
-                    vol.Required(CONF_CONNECTION_DIAGNOSTICS, default=True): BooleanSelector(),
-                    vol.Required(CONF_DEBUG_DIAGNOSTICS, default=False): BooleanSelector(),
-                }
-            ),
+            data_schema=features_schema(),
         )
 
     async def async_step_advanced(self, user_input=None):
@@ -214,16 +241,7 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
             return self._async_finish_setup()
         return self.async_show_form(
             step_id="advanced",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
-                        _number_box(MIN_SCAN_INTERVAL, MAX_SCAN_INTERVAL), vol.Coerce(int)
-                    ),
-                    vol.Required(CONF_CURRENT_TEMP_KEY, default=DEFAULT_CURRENT_TEMP_KEY): SelectSelector(
-                        SelectSelectorConfig(options=sources, mode=SelectSelectorMode.DROPDOWN)
-                    ),
-                }
-            ),
+            data_schema=advanced_schema(self._setup_options, dhw_enabled=dhw_enabled),
         )
 
     def _async_finish_setup(self) -> ConfigFlowResult:
@@ -233,7 +251,7 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_create_entry(title=title, data=data, options=self._setup_options)
 
     async def async_step_reconfigure(self, user_input=None):
-        """Reconfigure the endpoint and exact model selection."""
+        """Reconfigure the endpoint while keeping the original model locked."""
         entry = self._get_reconfigure_entry()
         defaults = {**entry.data, CONF_NAME: entry.title}
         errors = {}
@@ -249,6 +267,7 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 data = dict(user_input)
                 title = data.pop(CONF_NAME)
+                data[CONF_PROFILE] = entry.data.get(CONF_PROFILE, DEFAULT_PROFILE)
                 return self.async_update_reload_and_abort(
                     entry,
                     unique_id=unique,
@@ -257,39 +276,38 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=connection_schema(defaults, include_profile=True),
+            data_schema=connection_schema(defaults),
             errors=errors,
         )
 
 
 class KaisaiOptionsFlow(OptionsFlowWithReload):
-    """Edit the two supported advanced options and reload the entry."""
+    """Edit feature and advanced options, then reload the entry."""
+
+    _updated_options: dict[str, Any]
 
     @override
     async def async_step_init(self, user_input=None):
-        options = self.config_entry.options
-        dhw_enabled = options.get(CONF_DHW, False)
+        """Choose the same features offered during initial setup."""
+        if user_input is not None:
+            self._updated_options = {**self.config_entry.options, **user_input}
+            return await self.async_step_advanced()
+        return self.async_show_form(
+            step_id="init",
+            data_schema=features_schema(dict(self.config_entry.options)),
+        )
+
+    async def async_step_advanced(self, user_input=None):
+        """Choose polling and current-temperature options."""
+        dhw_enabled = self._updated_options.get(CONF_DHW, False)
         sources = _temperature_sources(dhw_enabled)
         allowed_sources = {source["value"] for source in sources}
-        current_source = options.get(CONF_CURRENT_TEMP_KEY, DEFAULT_CURRENT_TEMP_KEY)
-        if current_source not in allowed_sources:
-            current_source = DEFAULT_CURRENT_TEMP_KEY
         if user_input is not None:
             values = dict(user_input)
             if values[CONF_CURRENT_TEMP_KEY] not in allowed_sources:
                 values[CONF_CURRENT_TEMP_KEY] = DEFAULT_CURRENT_TEMP_KEY
-            return self.async_create_entry(data={**options, **values})
+            return self.async_create_entry(data={**self._updated_options, **values})
         return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_SCAN_INTERVAL,
-                        default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                    ): vol.All(_number_box(MIN_SCAN_INTERVAL, MAX_SCAN_INTERVAL), vol.Coerce(int)),
-                    vol.Required(CONF_CURRENT_TEMP_KEY, default=current_source): SelectSelector(
-                        SelectSelectorConfig(options=sources, mode=SelectSelectorMode.DROPDOWN)
-                    ),
-                }
-            ),
+            step_id="advanced",
+            data_schema=advanced_schema(self._updated_options, dhw_enabled=dhw_enabled),
         )
