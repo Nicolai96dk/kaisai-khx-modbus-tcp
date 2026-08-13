@@ -24,6 +24,21 @@ def test_hacs_and_translation_metadata() -> None:
     assert "features" in strings["config"]["step"]
     assert "advanced" in strings["config"]["step"]
     assert set(strings["options"]["step"]["init"]["data"]) == {
+        "heating_enabled",
+        "cooling_enabled",
+        "dhw_enabled",
+        "control_enabled",
+        "power_switch_enabled",
+        "power_state_readback_enabled",
+        "enable_fault_monitoring",
+        "individual_fault_sensors_enabled",
+        "performance_diagnostics_enabled",
+        "io_diagnostics_enabled",
+        "max_outlet_diagnostic_enabled",
+        "connection_diagnostics_enabled",
+        "debug_diagnostics_enabled",
+    }
+    assert set(strings["options"]["step"]["advanced"]["data"]) == {
         "scan_interval",
         "current_temperature_register",
     }
@@ -63,6 +78,21 @@ def test_setup_exposes_only_exact_models_and_selected_features() -> None:
         "CONF_DEBUG_DIAGNOSTICS",
     ):
         assert feature in source
+    assert "include_profile" not in source
+    assert "data_schema=connection_schema(defaults)" in source
+    assert "data[CONF_PROFILE] = entry.data.get" in source
+
+
+def test_post_setup_options_repeat_features_then_advanced() -> None:
+    source = (ROOT / "custom_components/kaisai_khx/config_flow.py").read_text()
+    readme = (ROOT / "README.md").read_text()
+
+    assert "class KaisaiOptionsFlow(OptionsFlowWithReload)" in source
+    assert "data_schema=features_schema(dict(self.config_entry.options))" in source
+    assert "return await self.async_step_advanced()" in source
+    assert "data_schema=advanced_schema(self._updated_options" in source
+    assert "features such as DHW" in readme
+    assert "selected model is intentionally locked after setup" in readme
 
 
 def test_number_selector_never_receives_a_null_step() -> None:
@@ -77,8 +107,8 @@ def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.2.3"
-    assert 'VERSION = "0.2.3"' in const_source
+    assert manifest["version"] == "0.3.0"
+    assert 'VERSION = "0.3.0"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
 
 
