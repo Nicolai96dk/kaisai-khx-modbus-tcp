@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,9 @@ from .profile import (
     RegisterProfile,
     RegisterType,
 )
+
+POWER_STATE_VERIFY_ATTEMPTS = 6
+POWER_STATE_VERIFY_DELAY = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,14 +139,20 @@ class KaisaiKhxDevice:
         if key == self.profile.power_command_key and self.profile.power_state_key:
             candidate = self.profile.registers.get(self.profile.power_state_key)
             if candidate is not None:
-                try:
-                    confirmed = (await self._read(candidate.register_type, candidate.address, 1))[0]
-                except Exception:
-                    pass
-                else:
+                readback_available = False
+                for attempt in range(POWER_STATE_VERIFY_ATTEMPTS):
+                    try:
+                        confirmed = (await self._read(candidate.register_type, candidate.address, 1))[0]
+                    except Exception:
+                        break
+                    readback_available = True
                     if confirmed != raw:
-                        raise RuntimeError("Power-state readback did not match the command")
+                        if attempt < POWER_STATE_VERIFY_ATTEMPTS - 1:
+                            await asyncio.sleep(POWER_STATE_VERIFY_DELAY)
+                        continue
                     return
+                if readback_available:
+                    raise RuntimeError("Power-state readback did not match the command")
         confirmed = (await self._read(confirmation.register_type, confirmation.address, 1))[0]
         if confirmed != raw:
             raise RuntimeError(f"Write verification failed for {key}")

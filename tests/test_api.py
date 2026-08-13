@@ -2,9 +2,11 @@
 
 from dataclasses import replace
 from types import MappingProxyType
+from unittest.mock import AsyncMock
 
 import pytest
 
+import custom_components.kaisai_khx.api as api_module
 from custom_components.kaisai_khx.api import KaisaiKhxDevice, plan_reads
 from custom_components.kaisai_khx.profile import BUILTIN_PROFILE, profile_with_overrides
 
@@ -116,9 +118,37 @@ async def test_power_write_falls_back_to_command_register() -> None:
 
 
 @pytest.mark.asyncio
-async def test_power_write_fails_on_actual_state_mismatch() -> None:
+async def test_power_write_fails_on_actual_state_mismatch(monkeypatch) -> None:
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_module.asyncio, "sleep", sleep)
     with pytest.raises(RuntimeError, match="did not match"):
         await KaisaiKhxDevice(PowerReadbackUnit(mismatch=True), BUILTIN_PROFILE).write("power", 1)
+    assert sleep.await_count == 5
+
+
+class DelayedPowerReadbackUnit(PowerReadbackUnit):
+    def __init__(self):
+        super().__init__(mismatch=True)
+        self.readback_count = 0
+
+    async def read_holding_registers(self, address, count):
+        if address == 2011:
+            self.readback_count += 1
+            if self.readback_count == 3:
+                self.values[2011] = self.values[1011]
+        return await super().read_holding_registers(address, count)
+
+
+@pytest.mark.asyncio
+async def test_power_write_waits_for_delayed_actual_state(monkeypatch) -> None:
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_module.asyncio, "sleep", sleep)
+    unit = DelayedPowerReadbackUnit()
+
+    await KaisaiKhxDevice(unit, BUILTIN_PROFILE).write("power", 1)
+
+    assert unit.readback_count == 3
+    assert sleep.await_count == 2
 
 
 @pytest.mark.asyncio

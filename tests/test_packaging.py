@@ -77,8 +77,8 @@ def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.2.1"
-    assert 'VERSION = "0.2.1"' in const_source
+    assert manifest["version"] == "0.2.2"
+    assert 'VERSION = "0.2.2"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
 
 
