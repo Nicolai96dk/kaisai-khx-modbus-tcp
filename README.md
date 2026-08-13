@@ -29,9 +29,35 @@ KAISAI KHX heat pumps do **not** have Ethernet or Modbus TCP built in. The heat-
 
 The integration currently owns one TCP connection per configured heat pump to that external gateway through Home Assistant's `modbus-connection` Python package and its pymodbus backend. It does not depend on a nonexistent Home Assistant `modbus_connection` integration. Device logic accepts only the backend-neutral `ModbusUnit` protocol, keeping transport code isolated for a future shared Core connection API.
 
-```text
-Home Assistant ── Modbus TCP / Ethernet ── RS485 gateway ── Modbus RTU / RS485 ── KAISAI KHX
+```mermaid
+flowchart LR
+    HA["`Home Assistant
+    KAISAI KHX integration
+    Owns the TCP connection`"]
+
+    GATEWAY["`RS485-to-Ethernet gateway
+    For example, Waveshare RS485 TO ETH (B)
+    Converts Modbus TCP to Modbus RTU`"]
+
+    KHX["`KAISAI KHX heat pump
+    Modbus RTU device
+    No built-in Modbus TCP`"]
+
+    HA ==>|"Ethernet · Modbus TCP · port 502"| GATEWAY
+    GATEWAY ==>|"RS485 cable · Modbus RTU · 9600 baud · 8N1"| KHX
 ```
+
+## Disclaimer
+
+This is an independent, unofficial project and is not affiliated with, endorsed by, or supported by KAISAI, Klima-Therm, Waveshare, or Home Assistant.
+
+Use this integration and the associated wiring and gateway configuration entirely at your own risk. Incorrect wiring, configuration, register mappings, or Modbus commands may cause unexpected operation, equipment damage, loss of heating or hot water, or unsafe conditions.
+
+Always verify compatibility with the exact heat-pump model, firmware, register documentation, and gateway in use. Electrical and RS485 installation must comply with local regulations and, where required, be performed by a qualified installer.
+
+This integration must not be used as a safety, protection, emergency, or frost-protection system. The heat pump's built-in protections and manufacturer-approved controls must remain operational.
+
+The authors and contributors accept no responsibility for damage, loss, injury, additional energy consumption, or equipment malfunction resulting from use of this project.
 
 ## Installation and setup
 
@@ -56,29 +82,46 @@ A compatible gateway must act as a Modbus TCP-to-RTU bridge. One example is the 
 
 The following Waveshare configuration is derived from a working KHX installation:
 
-| Section | Setting | Value | Notes |
-|---|---|---:|---|
-| Network | Work Mode | TCP Server | Home Assistant connects to the gateway |
-| Network | Device Port | 502 | Enter this as **Port** in the integration |
-| Network | Device Web Port | 80 | Gateway administration only |
-| Network | Device IP | User-specific | Enter this address as **Gateway host/IP**; keep it stable with a DHCP reservation or static configuration |
-| Network | Subnet Mask | Network-specific | Example: `255.255.255.0` |
-| Network | Gateway | User-specific | The router/gateway for the local network |
-| Network | IP mode | DHCP | The working example uses DHCP; a reservation is recommended |
-| Network | Destination IP/DNS | User-specific | Not used by this integration when the converter operates as a TCP server |
-| Network | Destination Port | 4196 | Shown in the working example; not used by this integration in TCP Server mode |
-| Serial | Baud Rate | 9600 | Must match the KHX RS485 bus |
-| Serial | Databits | 8 | 8N1 |
-| Serial | Parity | None | 8N1 |
-| Serial | Stopbits | 1 | 8N1 |
-| Serial | Flow control | None | No serial flow control |
-| Advanced | No-Data-Restart | Disable | Working example |
-| Advanced | No Data Restart Time | 300 seconds | Inactive while No-Data-Restart is disabled |
-| Advanced | Reconnect-time | 12 seconds | Working example |
-| Multi-Host | Protocol | Modbus TCP to RTU | Required protocol conversion |
-| Multi-Host | Instruction Time out | 224 ms | Waveshare requires a multiple of 32 ms |
-| Multi-Host | Enable Multi-host | Yes | Allows the gateway's Modbus multi-host mode |
-| Multi-Host | RS485 Conflict Time Gap | 20 ms | Working example |
+#### Network
+
+| Setting | Value | Notes |
+|---|---:|---|
+| Work Mode | TCP Server | Home Assistant connects to the gateway |
+| Device Port | 502 | Enter this as **Port** in the integration |
+| Device Web Port | 80 | Gateway administration only |
+| Device IP | User-specific | Enter this address as **Gateway host/IP**; keep it stable with a DHCP reservation or static configuration |
+| Subnet Mask | Network-specific | Example: `255.255.255.0` |
+| Gateway | User-specific | The router/gateway for the local network |
+| IP mode | DHCP | The working example uses DHCP; a reservation is recommended |
+| Destination IP/DNS | User-specific | Not used by this integration when the converter operates as a TCP server |
+| Destination Port | 4196 | Shown in the working example; not used by this integration in TCP Server mode |
+
+#### Serial
+
+| Setting | Value | Notes |
+|---|---:|---|
+| Baud Rate | 9600 | Must match the KHX RS485 bus |
+| Databits | 8 | 8N1 |
+| Parity | None | 8N1 |
+| Stopbits | 1 | 8N1 |
+| Flow control | None | No serial flow control |
+
+#### Advanced
+
+| Setting | Value | Notes |
+|---|---:|---|
+| No-Data-Restart | Disable | Working example |
+| No Data Restart Time | 300 seconds | Inactive while No-Data-Restart is disabled |
+| Reconnect-time | 12 seconds | Working example |
+
+#### Multi-host
+
+| Setting | Value | Notes |
+|---|---:|---|
+| Protocol | Modbus TCP to RTU | Required protocol conversion |
+| Instruction Time out | 224 ms | Waveshare requires a multiple of 32 ms |
+| Enable Multi-host | Yes | Allows the gateway's Modbus multi-host mode |
+| RS485 Conflict Time Gap | 20 ms | Working example |
 
 Connect the gateway's RS485 terminals to the KHX RS485 bus according to the KHX and gateway wiring documentation. RS485 polarity labels vary between manufacturers, so verify the `A/B` or `+/-` mapping before applying power. Do not expose TCP port 502 to the public internet.
 
