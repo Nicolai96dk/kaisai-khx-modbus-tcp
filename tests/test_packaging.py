@@ -65,12 +65,20 @@ def test_setup_exposes_only_exact_models_and_selected_features() -> None:
         assert feature in source
 
 
+def test_number_selector_never_receives_a_null_step() -> None:
+    """A null selector step prevents Home Assistant from loading the first form."""
+    source = (ROOT / "custom_components/kaisai_khx/config_flow.py").read_text()
+    assert "step=step" not in source
+    assert 'if step is not None:' in source
+    assert 'config["step"] = step' in source
+
+
 def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.2.0"
-    assert 'VERSION = "0.2.0"' in const_source
+    assert manifest["version"] == "0.2.1"
+    assert 'VERSION = "0.2.1"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
 
 

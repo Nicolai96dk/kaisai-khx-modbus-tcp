@@ -13,6 +13,14 @@ jobs:
       - run: ruff check .
       - run: python -m compileall custom_components
       - run: pytest
+  home-assistant-config-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.14"}
+      - run: pip install pytest "homeassistant==2026.8.1" "modbus-connection[pymodbus]==3.8.1"
+      - run: pytest -q tests/test_config_flow_schema.py
   hassfest:
     runs-on: ubuntu-latest
     steps:
