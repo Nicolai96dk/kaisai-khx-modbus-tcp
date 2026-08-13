@@ -26,4 +26,4 @@ jobs:
           kaisai_khx.zip
           --verify-tag
           --generate-notes
-          --title "Kaisai KHX Modbus TCP ${GITHUB_REF_NAME}"
+          --title "${GITHUB_REF_NAME}"

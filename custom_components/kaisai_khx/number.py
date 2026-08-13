@@ -12,8 +12,9 @@ from .entity import KaisaiEntity
 async def async_setup_entry(
     hass: HomeAssistant, entry: KaisaiConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    if "dhw_target_temperature" in entry.runtime_data.profile.registers:
-        async_add_entities([DhwTarget(entry.runtime_data)])
+    coordinator = entry.runtime_data
+    if coordinator.control_enabled and coordinator.dhw_enabled:
+        async_add_entities([DhwTarget(coordinator)])
 
 
 class DhwTarget(KaisaiEntity, NumberEntity):

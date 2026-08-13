@@ -117,15 +117,49 @@ def test_documented_kaisai_data_types(data_type, raw, expected) -> None:
     assert RegisterDefinition("test", 1, "Test", data_type=data_type).decode(raw) == expected
 
 
-def test_register_2013_is_digi1_and_2014_is_temp() -> None:
+def test_register_2013_and_2014_are_tenth_degree_temperatures() -> None:
     calculated = BUILTIN_PROFILE.registers["calculated_temperature"]
     compensated = BUILTIN_PROFILE.registers["compensated_temperature"]
     assert calculated.address == 2013
-    assert calculated.data_type == DataType.DIGI1
-    assert calculated.decode(250) == 250
+    assert calculated.data_type == DataType.TEMP
+    assert calculated.decode(206) == 20.6
+    assert calculated.decode(32767) is None
     assert compensated.address == 2014
     assert compensated.data_type == DataType.TEMP
     assert compensated.decode(250) == 25.0
+
+
+def test_feature_filtering_and_debug_diagnostics() -> None:
+    minimal = profile_for_capabilities(
+        BUILTIN_PROFILES[KHX_09_PROFILE_ID],
+        dhw_enabled=False,
+        performance_diagnostics_enabled=False,
+        io_diagnostics_enabled=False,
+        max_outlet_diagnostic_enabled=False,
+    )
+    assert "water_tank_temperature" not in minimal.registers
+    assert "compressor_frequency" not in minimal.registers
+    assert "output_states" not in minimal.registers
+    assert "maximum_water_outlet_temperature" not in minimal.registers
+
+    debug = profile_for_capabilities(
+        BUILTIN_PROFILES[KHX_09_PROFILE_ID],
+        dhw_enabled=False,
+        performance_diagnostics_enabled=False,
+        io_diagnostics_enabled=False,
+        max_outlet_diagnostic_enabled=False,
+        debug_diagnostics_enabled=True,
+    )
+    assert "compressor_frequency" in debug.registers
+    assert "output_states" in debug.registers
+    assert "maximum_water_outlet_temperature" in debug.registers
+    assert "fan_2_speed" not in debug.registers
+
+
+def test_disabled_temperature_source_falls_back_to_outlet() -> None:
+    profile = profile_with_overrides(None, "water_tank_temperature")
+    filtered = profile_for_capabilities(profile, dhw_enabled=False)
+    assert filtered.current_temperature_key == "water_outlet_temperature"
 
 
 def test_model_profiles_share_map_but_have_distinct_capabilities() -> None:

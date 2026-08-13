@@ -11,8 +11,9 @@ from .entity import KaisaiEntity
 async def async_setup_entry(
     hass: HomeAssistant, entry: KaisaiConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    if "dhw_target_temperature" in entry.runtime_data.profile.registers:
-        async_add_entities([OperatingModeSelect(entry.runtime_data)])
+    coordinator = entry.runtime_data
+    if coordinator.control_enabled and coordinator.dhw_enabled:
+        async_add_entities([OperatingModeSelect(coordinator)])
 
 
 class OperatingModeSelect(KaisaiEntity, SelectEntity):
@@ -20,7 +21,16 @@ class OperatingModeSelect(KaisaiEntity, SelectEntity):
 
     def __init__(self, coordinator):
         super().__init__(coordinator, "operating_mode")
-        self._mapping = coordinator.profile.registers["mode"].enum
+        allowed = {"hot_water"}
+        if coordinator.heating_enabled:
+            allowed.update({"heating", "hot_water_heating"})
+        if coordinator.cooling_enabled:
+            allowed.update({"cooling", "hot_water_cooling"})
+        self._mapping = {
+            raw: mode
+            for raw, mode in coordinator.profile.registers["mode"].enum.items()
+            if mode in allowed
+        }
         self._attr_options = list(self._mapping.values())
 
     @property
