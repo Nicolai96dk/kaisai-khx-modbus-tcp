@@ -66,9 +66,14 @@ SELECTABLE_PROFILE_IDS = {option["value"] for option in PROFILE_OPTIONS}
 
 def _number_box(minimum: float, maximum: float, *, step: float | None = None) -> NumberSelector:
     """Create a boxed number selector."""
-    return NumberSelector(
-        NumberSelectorConfig(min=minimum, max=maximum, step=step, mode=NumberSelectorMode.BOX)
-    )
+    config: NumberSelectorConfig = {
+        "min": minimum,
+        "max": maximum,
+        "mode": NumberSelectorMode.BOX,
+    }
+    if step is not None:
+        config["step"] = step
+    return NumberSelector(config)
 
 
 def _profile_selector(default: str = DEFAULT_PROFILE) -> SelectSelector:
