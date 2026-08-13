@@ -77,9 +77,22 @@ def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.2.2"
-    assert 'VERSION = "0.2.2"' in const_source
+    assert manifest["version"] == "0.2.3"
+    assert 'VERSION = "0.2.3"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
+
+
+def test_rs485_gateway_requirements_are_documented() -> None:
+    readme = (ROOT / "README.md").read_text()
+    strings = json.loads((ROOT / "custom_components/kaisai_khx/strings.json").read_text())
+    first_step = strings["config"]["step"]["user"]
+
+    assert "do **not** have Ethernet or Modbus TCP built in" in readme
+    assert "Modbus TCP to RTU" in readme
+    assert "RS485 TO POE ETH (B)" in readme
+    assert "| Serial | Baud Rate | 9600 |" in readme
+    assert first_step["data"]["host"] == "Gateway host/IP"
+    assert "no built-in Modbus TCP" in first_step["description"]
 
 
 def test_no_generic_write_surface_exists() -> None:

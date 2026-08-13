@@ -3,12 +3,12 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to a KAISAI KHX",
-        "description": "Enter the Modbus TCP connection. Setup performs only a safe read before model selection.",
+        "title": "Connect to a KAISAI KHX through an RS485 gateway",
+        "description": "KAISAI KHX has no built-in Modbus TCP. Enter the address of an external Modbus TCP-to-RTU gateway connected to the heat pump's RS485 bus. Setup performs only a safe read before model selection.",
         "data": {
-          "host": "Host",
-          "port": "Port",
-          "unit_id": "Unit ID",
+          "host": "Gateway host/IP",
+          "port": "Gateway TCP port",
+          "unit_id": "KHX Modbus unit ID",
           "name": "Device name"
         }
       },
@@ -51,10 +51,11 @@
       },
       "reconfigure": {
         "title": "Reconfigure KAISAI KHX",
+        "description": "Enter the external Modbus TCP-to-RTU gateway connection. The KAISAI KHX itself has no built-in Modbus TCP.",
         "data": {
-          "host": "Host",
-          "port": "Port",
-          "unit_id": "Unit ID",
+          "host": "Gateway host/IP",
+          "port": "Gateway TCP port",
+          "unit_id": "KHX Modbus unit ID",
           "name": "Device name",
           "profile": "Model"
         }
