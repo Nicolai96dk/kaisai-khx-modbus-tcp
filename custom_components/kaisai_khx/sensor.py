@@ -63,6 +63,8 @@ DESCRIPTIONS = (
     Desc(
         key="calculated_temperature",
         translation_key="calculated_temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     Desc(
@@ -100,7 +102,16 @@ DESCRIPTIONS = (
     ),
 )
 
-_VIRTUAL_KEYS = {"unit_id", "active_profile", "last_successful_update", "failed_poll_count", "target_temperature"}
+_CONNECTION_KEYS = {"unit_id", "active_profile", "last_successful_update", "failed_poll_count"}
+_PERFORMANCE_KEYS = {
+    "calculated_temperature",
+    "compensated_temperature",
+    "compressor_frequency",
+    "fan_1_speed",
+    "fan_2_speed",
+    "target_temperature",
+}
+_VIRTUAL_KEYS = _CONNECTION_KEYS | {"target_temperature"}
 
 
 async def async_setup_entry(
@@ -108,13 +119,16 @@ async def async_setup_entry(
 ) -> None:
     """Create only entities applicable to the active profile."""
     coordinator = entry.runtime_data
-    descriptions = [
-        description
-        for description in DESCRIPTIONS
-        if description.key in coordinator.profile.registers or description.key in _VIRTUAL_KEYS
-    ]
+    descriptions = []
+    for description in DESCRIPTIONS:
+        if description.key in _CONNECTION_KEYS and not coordinator.connection_diagnostics_enabled:
+            continue
+        if description.key in _PERFORMANCE_KEYS and not coordinator.performance_diagnostics_enabled:
+            continue
+        if description.key in coordinator.profile.registers or description.key in _VIRTUAL_KEYS:
+            descriptions.append(description)
     entities: list[SensorEntity] = [KaisaiSensor(coordinator, description) for description in descriptions]
-    if coordinator.profile.capabilities.enable_fault_monitoring:
+    if coordinator.fault_monitoring_enabled:
         entities.append(KaisaiActiveFaultSensor(coordinator))
     async_add_entities(entities)
 
@@ -125,6 +139,10 @@ class KaisaiSensor(KaisaiEntity, SensorEntity):
     def __init__(self, coordinator, description: Desc):
         super().__init__(coordinator, description.key)
         self.entity_description = description
+        if description.key == "maximum_water_outlet_temperature" or (
+            coordinator.debug_diagnostics_enabled and description.entity_category == EntityCategory.DIAGNOSTIC
+        ):
+            self._attr_entity_registry_enabled_default = True
 
     @property
     def native_value(self):

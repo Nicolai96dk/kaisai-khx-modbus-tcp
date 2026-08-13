@@ -16,8 +16,9 @@ async def async_setup_entry(
     """Create aggregate faults and applicable optional diagnostic bits."""
     coordinator = entry.runtime_data
     entities: list[BinarySensorEntity] = [KaisaiBitSensor(coordinator, bit) for bit in coordinator.profile.bits]
-    if coordinator.profile.capabilities.enable_fault_monitoring:
+    if coordinator.fault_monitoring_enabled:
         entities.append(KaisaiFaultSensor(coordinator))
+    if coordinator.individual_faults_enabled:
         entities.extend(
             KaisaiIndividualFaultSensor(coordinator, definition)
             for definition in FAULT_DEFINITIONS
@@ -54,6 +55,7 @@ class KaisaiBitSensor(KaisaiEntity, BinarySensorEntity):
         super().__init__(coordinator, bit.key)
         self._bit = bit
         self._attr_name = bit.name
+        self._attr_entity_registry_enabled_default = True
 
     @property
     def is_on(self):
@@ -74,6 +76,7 @@ class KaisaiIndividualFaultSensor(KaisaiEntity, BinarySensorEntity):
         super().__init__(coordinator, f"fault_{definition.register}_{definition.bit}")
         self._definition = definition
         self._attr_name = definition.name
+        self._attr_entity_registry_enabled_default = True
 
     @property
     def is_on(self) -> bool | None:

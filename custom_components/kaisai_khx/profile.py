@@ -295,12 +295,10 @@ _COMMON_REGISTERS: dict[str, RegisterDefinition] = {
         data_type=DataType.DIGI1,
         enum={0: "cooling", 1: "heating", 2: "defrosting", 3: "high_temperature_disinfection", 4: "hot_water"},
     ),
-    "calculated_temperature": RegisterDefinition(
-        "calculated_temperature",
-        2013,
-        "Calculated current temperature",
-        data_type=DataType.DIGI1,
-        optional=True,
+    # The manual labels 2013 as DIGI1, but real KHX-09PY1 values use the
+    # controller's 0.1 C temperature representation (206 == 20.6 C).
+    "calculated_temperature": _temp(
+        "calculated_temperature", 2013, "Calculated current temperature", optional=True
     ),
     "compensated_temperature": _temp("compensated_temperature", 2014, "Compensated current temperature", optional=True),
     "output_states": RegisterDefinition(
@@ -476,22 +474,59 @@ def profile_for_capabilities(
     *,
     dhw_enabled: bool,
     fan_2_enabled: bool | None = None,
+    heating_enabled: bool = True,
+    cooling_enabled: bool = True,
+    power_state_readback_enabled: bool = True,
+    fault_monitoring_enabled: bool = True,
+    performance_diagnostics_enabled: bool = True,
+    io_diagnostics_enabled: bool = False,
+    max_outlet_diagnostic_enabled: bool = False,
+    debug_diagnostics_enabled: bool = False,
 ) -> RegisterProfile:
-    """Remove optional registers that do not apply to this device profile."""
+    """Return the model profile filtered to the selected user features."""
     disabled: set[str] = set()
     if not dhw_enabled:
         disabled.update({"dhw_target_temperature", "water_tank_temperature"})
+    if not heating_enabled:
+        disabled.add("heating_target_temperature")
+    if not cooling_enabled:
+        disabled.add("cooling_target_temperature")
 
     supports_fan_2 = profile.capabilities.supports_fan_2
     if supports_fan_2 is None:
         supports_fan_2 = bool(fan_2_enabled)
     if not supports_fan_2:
         disabled.add("fan_2_speed")
-    if not profile.capabilities.enable_fault_monitoring:
+    if not power_state_readback_enabled:
+        disabled.add("power_state")
+    if not (fault_monitoring_enabled or debug_diagnostics_enabled):
         disabled.update(key for key in profile.registers if key.startswith("fault_"))
+    if not (performance_diagnostics_enabled or debug_diagnostics_enabled):
+        disabled.update(
+            {
+                "calculated_temperature",
+                "compensated_temperature",
+                "compressor_frequency",
+                "fan_1_speed",
+                "fan_2_speed",
+            }
+        )
+    if not (io_diagnostics_enabled or debug_diagnostics_enabled):
+        disabled.update({"output_states", "input_states"})
+    if not (max_outlet_diagnostic_enabled or debug_diagnostics_enabled):
+        disabled.add("maximum_water_outlet_temperature")
 
     registers = MappingProxyType(
         {key: definition for key, definition in profile.registers.items() if key not in disabled}
     )
     bits = tuple(definition for definition in profile.bits if definition.register in registers)
-    return replace(profile, registers=registers, bits=bits)
+    current_temperature_key = profile.current_temperature_key
+    if current_temperature_key not in registers:
+        current_temperature_key = "water_outlet_temperature"
+    return replace(
+        profile,
+        registers=registers,
+        bits=bits,
+        current_temperature_key=current_temperature_key,
+        power_state_key="power_state" if "power_state" in registers else None,
+    )

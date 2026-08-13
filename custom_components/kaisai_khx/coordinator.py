@@ -15,7 +15,22 @@ from homeassistant.util import dt as dt_util
 from modbus_connection import ModbusConnection, ModbusError
 
 from .api import KaisaiKhxDevice
-from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN, FAILURES_UNTIL_UNAVAILABLE
+from .const import (
+    CONF_CONNECTION_DIAGNOSTICS,
+    CONF_CONTROL,
+    CONF_COOLING,
+    CONF_DEBUG_DIAGNOSTICS,
+    CONF_DHW,
+    CONF_FAULT_MONITORING,
+    CONF_HEATING,
+    CONF_INDIVIDUAL_FAULTS,
+    CONF_PERFORMANCE_DIAGNOSTICS,
+    CONF_POWER_SWITCH,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    FAILURES_UNTIL_UNAVAILABLE,
+)
 from .faults import ActiveFault, decode_faults
 from .profile import RegisterProfile
 
@@ -58,6 +73,47 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             model=profile.capabilities.model,
             name=entry.title,
         )
+
+    @property
+    def debug_diagnostics_enabled(self) -> bool:
+        """Return whether every applicable diagnostic entity is enabled."""
+        return self.config_entry.options.get(CONF_DEBUG_DIAGNOSTICS, False)
+
+    @property
+    def control_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_CONTROL, True)
+
+    @property
+    def heating_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_HEATING, True)
+
+    @property
+    def cooling_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_COOLING, True)
+
+    @property
+    def dhw_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_DHW, False)
+
+    @property
+    def power_switch_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_POWER_SWITCH, False)
+
+    @property
+    def fault_monitoring_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_FAULT_MONITORING, True) or self.debug_diagnostics_enabled
+
+    @property
+    def individual_faults_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_INDIVIDUAL_FAULTS, False) or self.debug_diagnostics_enabled
+
+    @property
+    def performance_diagnostics_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_PERFORMANCE_DIAGNOSTICS, True) or self.debug_diagnostics_enabled
+
+    @property
+    def connection_diagnostics_enabled(self) -> bool:
+        return self.config_entry.options.get(CONF_CONNECTION_DIAGNOSTICS, True) or self.debug_diagnostics_enabled
 
     @property
     def communication_available(self) -> bool:
