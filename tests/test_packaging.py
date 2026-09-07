@@ -41,16 +41,28 @@ def test_hacs_and_translation_metadata() -> None:
     assert set(strings["options"]["step"]["advanced"]["data"]) == {
         "scan_interval",
         "current_temperature_register",
+        "weather_entity",
+        "indoor_temperature_entity",
     }
     assert "active_fault" in strings["entity"]["sensor"]
     assert "fault" in strings["entity"]["binary_sensor"]
-    assert "heat_curve" in strings["entity"]["switch"]
+    assert "heat_curve" not in strings["entity"]["switch"]
+    assert "heat_curve_mode" in strings["entity"]["select"]
     assert {
         "heat_curve_starting_point",
         "heat_curve_curve",
         "heat_curve_high_limit",
         "heat_curve_low_limit",
+        "prediction_horizon",
+        "indoor_target_temperature",
     } <= strings["entity"]["number"].keys()
+    assert {
+        "heat_curve_status",
+        "calculated_heating_target",
+        "effective_ambient_temperature",
+        "forecast_temperature",
+        "indoor_correction",
+    } <= strings["entity"]["sensor"].keys()
     assert "invalid_heat_curve_limits" in strings["exceptions"]
     assert "invalid_heat_curve_value" in strings["exceptions"]
     assert (ROOT / "custom_components/kaisai_khx/brand/icon.png").is_file()
@@ -116,8 +128,8 @@ def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.4.0"
-    assert 'VERSION = "0.4.0"' in const_source
+    assert manifest["version"] == "0.5.0"
+    assert 'VERSION = "0.5.0"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
 
 

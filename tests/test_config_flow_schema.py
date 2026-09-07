@@ -55,3 +55,11 @@ def test_post_setup_advanced_form_tracks_dhw_feature() -> None:
         "water_outlet_temperature",
     }
     assert "water_tank_temperature" in {option["value"] for option in with_options}
+    assert [field["name"] for field in without_dhw] == [
+        "scan_interval",
+        "current_temperature_register",
+        "weather_entity",
+        "indoor_temperature_entity",
+    ]
+    assert without_dhw[2]["selector"]["entity"]["domain"] == "weather"
+    assert without_dhw[3]["selector"]["entity"]["domain"] == "sensor"

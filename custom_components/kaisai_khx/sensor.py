@@ -1,7 +1,7 @@
 """Sensors for KAISAI KHX."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.const import EntityCategory, UnitOfFrequency, UnitOfTemperature
@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import KaisaiConfigEntry
-from .entity import KaisaiEntity
+from .entity import KaisaiEntity, KaisaiLocalConfigEntity
 from .faults import raw_fault_registers
 
 
@@ -130,6 +130,36 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [KaisaiSensor(coordinator, description) for description in descriptions]
     if coordinator.fault_monitoring_enabled:
         entities.append(KaisaiActiveFaultSensor(coordinator))
+    if coordinator.control_enabled and coordinator.heating_enabled:
+        entities.extend(
+            [
+                HeatCurveStatusSensor(coordinator),
+                HeatCurveValueSensor(
+                    coordinator,
+                    "calculated_heating_target",
+                    "calculated_heating_target",
+                    "heat_curve_last_target",
+                ),
+                HeatCurveValueSensor(
+                    coordinator,
+                    "effective_ambient_temperature",
+                    "effective_ambient_temperature",
+                    "heat_curve_effective_ambient",
+                ),
+                HeatCurveValueSensor(
+                    coordinator,
+                    "forecast_temperature",
+                    "forecast_temperature",
+                    "heat_curve_forecast_temperature",
+                ),
+                HeatCurveValueSensor(
+                    coordinator,
+                    "indoor_correction",
+                    "indoor_correction",
+                    "heat_curve_indoor_correction",
+                ),
+            ]
+        )
     async_add_entities(entities)
 
 
@@ -200,3 +230,46 @@ class KaisaiActiveFaultSensor(KaisaiEntity, SensorEntity):
             ],
             "raw_fault_registers": raw_fault_registers(self.coordinator.data or {}),
         }
+
+
+class HeatCurveStatusSensor(KaisaiLocalConfigEntity, SensorEntity):
+    """Explain the selected and effective heating-target control modes."""
+
+    _attr_translation_key = "heat_curve_status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options: ClassVar[list[str]] = [
+        "manual",
+        "active",
+        "fallback",
+        "suspended",
+        "write_error",
+    ]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator, "heat_curve_status")
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.heat_curve_status
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return dict(self.coordinator.heat_curve_status_details)
+
+
+class HeatCurveValueSensor(KaisaiLocalConfigEntity, SensorEntity):
+    """Expose a numeric intermediate value from heating-target control."""
+
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, key: str, translation_key: str, coordinator_attribute: str):
+        super().__init__(coordinator, key)
+        self._attr_translation_key = translation_key
+        self._coordinator_attribute = coordinator_attribute
+
+    @property
+    def native_value(self) -> float | None:
+        return getattr(self.coordinator, self._coordinator_attribute)

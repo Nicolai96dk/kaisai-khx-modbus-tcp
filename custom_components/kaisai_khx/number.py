@@ -1,7 +1,7 @@
 """Number entities for KAISAI KHX."""
 
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -12,6 +12,10 @@ from .heat_curve import (
     HEAT_CURVE_CURVE_MIN,
     HEAT_CURVE_TEMPERATURE_MAX,
     HEAT_CURVE_TEMPERATURE_MIN,
+    INDOOR_TARGET_MAX,
+    INDOOR_TARGET_MIN,
+    PREDICTION_HORIZON_MAX,
+    PREDICTION_HORIZON_MIN,
     HeatCurveSetting,
 )
 
@@ -63,6 +67,24 @@ async def async_setup_entry(
                     0.5,
                     temperature=True,
                 ),
+                HeatCurveNumber(
+                    coordinator,
+                    "prediction_horizon",
+                    "prediction_horizon",
+                    PREDICTION_HORIZON_MIN,
+                    PREDICTION_HORIZON_MAX,
+                    1,
+                    unit=UnitOfTime.HOURS,
+                ),
+                HeatCurveNumber(
+                    coordinator,
+                    "indoor_target",
+                    "indoor_target_temperature",
+                    INDOOR_TARGET_MIN,
+                    INDOOR_TARGET_MAX,
+                    0.1,
+                    temperature=True,
+                ),
             ]
         )
     async_add_entities(entities)
@@ -103,6 +125,7 @@ class HeatCurveNumber(KaisaiLocalConfigEntity, NumberEntity):
         step: float,
         *,
         temperature: bool = False,
+        unit: str | None = None,
     ) -> None:
         super().__init__(coordinator, f"heat_curve_{setting}")
         self._setting = setting
@@ -113,6 +136,8 @@ class HeatCurveNumber(KaisaiLocalConfigEntity, NumberEntity):
         if temperature:
             self._attr_device_class = NumberDeviceClass.TEMPERATURE
             self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+        elif unit:
+            self._attr_native_unit_of_measurement = unit
 
     @property
     def native_value(self) -> float:

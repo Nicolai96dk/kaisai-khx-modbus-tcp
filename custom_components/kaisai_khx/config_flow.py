@@ -6,10 +6,13 @@ import logging
 from typing import Any, override
 
 import voluptuous as vol
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -32,6 +35,7 @@ from .const import (
     CONF_FAULT_MONITORING,
     CONF_HEATING,
     CONF_INDIVIDUAL_FAULTS,
+    CONF_INDOOR_TEMPERATURE_ENTITY,
     CONF_IO_DIAGNOSTICS,
     CONF_MAX_OUTLET_DIAGNOSTIC,
     CONF_PERFORMANCE_DIAGNOSTICS,
@@ -40,6 +44,7 @@ from .const import (
     CONF_PROFILE,
     CONF_SCAN_INTERVAL,
     CONF_UNIT_ID,
+    CONF_WEATHER_ENTITY,
     DEFAULT_CURRENT_TEMP_KEY,
     DEFAULT_NAME,
     DEFAULT_PORT,
@@ -139,12 +144,25 @@ def features_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
 
 
 def advanced_schema(defaults: dict[str, Any], *, dhw_enabled: bool) -> vol.Schema:
-    """Build polling and current-temperature options."""
+    """Build polling, temperature-source, and predictive-control options."""
     sources = _temperature_sources(dhw_enabled)
     allowed_sources = {source["value"] for source in sources}
     current_source = defaults.get(CONF_CURRENT_TEMP_KEY, DEFAULT_CURRENT_TEMP_KEY)
     if current_source not in allowed_sources:
         current_source = DEFAULT_CURRENT_TEMP_KEY
+    weather_key = (
+        vol.Optional(CONF_WEATHER_ENTITY, default=defaults[CONF_WEATHER_ENTITY])
+        if defaults.get(CONF_WEATHER_ENTITY)
+        else vol.Optional(CONF_WEATHER_ENTITY)
+    )
+    indoor_key = (
+        vol.Optional(
+            CONF_INDOOR_TEMPERATURE_ENTITY,
+            default=defaults[CONF_INDOOR_TEMPERATURE_ENTITY],
+        )
+        if defaults.get(CONF_INDOOR_TEMPERATURE_ENTITY)
+        else vol.Optional(CONF_INDOOR_TEMPERATURE_ENTITY)
+    )
     return vol.Schema(
         {
             vol.Required(
@@ -154,8 +172,24 @@ def advanced_schema(defaults: dict[str, Any], *, dhw_enabled: bool) -> vol.Schem
             vol.Required(CONF_CURRENT_TEMP_KEY, default=current_source): SelectSelector(
                 SelectSelectorConfig(options=sources, mode=SelectSelectorMode.DROPDOWN)
             ),
+            weather_key: EntitySelector(EntitySelectorConfig(domain="weather", multiple=False)),
+            indoor_key: EntitySelector(
+                EntitySelectorConfig(
+                    domain="sensor",
+                    device_class=SensorDeviceClass.TEMPERATURE,
+                    multiple=False,
+                )
+            ),
         }
     )
+
+
+def _update_advanced_options(options: dict[str, Any], values: dict[str, Any]) -> None:
+    """Apply advanced values while allowing optional entity selections to be cleared."""
+    options.update(values)
+    for key in (CONF_WEATHER_ENTITY, CONF_INDOOR_TEMPERATURE_ENTITY):
+        if not values.get(key):
+            options.pop(key, None)
 
 
 async def validate_connection(data: dict[str, Any]) -> str | None:
@@ -229,7 +263,7 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_advanced(self, user_input=None):
-        """Configure only polling and the climate temperature source."""
+        """Configure polling, climate temperature, and predictive inputs."""
         dhw_enabled = self._setup_options.get(CONF_DHW, False)
         sources = _temperature_sources(dhw_enabled)
         allowed_sources = {source["value"] for source in sources}
@@ -237,7 +271,7 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
             values = dict(user_input)
             if values[CONF_CURRENT_TEMP_KEY] not in allowed_sources:
                 values[CONF_CURRENT_TEMP_KEY] = DEFAULT_CURRENT_TEMP_KEY
-            self._setup_options.update(values)
+            _update_advanced_options(self._setup_options, values)
             return self._async_finish_setup()
         return self.async_show_form(
             step_id="advanced",
@@ -298,7 +332,7 @@ class KaisaiOptionsFlow(OptionsFlowWithReload):
         )
 
     async def async_step_advanced(self, user_input=None):
-        """Choose polling and current-temperature options."""
+        """Choose polling, current-temperature, and predictive options."""
         dhw_enabled = self._updated_options.get(CONF_DHW, False)
         sources = _temperature_sources(dhw_enabled)
         allowed_sources = {source["value"] for source in sources}
@@ -306,7 +340,8 @@ class KaisaiOptionsFlow(OptionsFlowWithReload):
             values = dict(user_input)
             if values[CONF_CURRENT_TEMP_KEY] not in allowed_sources:
                 values[CONF_CURRENT_TEMP_KEY] = DEFAULT_CURRENT_TEMP_KEY
-            return self.async_create_entry(data={**self._updated_options, **values})
+            _update_advanced_options(self._updated_options, values)
+            return self.async_create_entry(data=self._updated_options)
         return self.async_show_form(
             step_id="advanced",
             data_schema=advanced_schema(self._updated_options, dhw_enabled=dhw_enabled),

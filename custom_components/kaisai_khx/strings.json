@@ -42,12 +42,18 @@
       },
       "advanced": {
         "title": "Advanced options",
-        "description": "Choose the polling interval and which water temperature the climate entity uses as its current temperature.",
+        "description": "Choose polling, climate temperature, and optional sources for predictive heating-target control.",
         "data": {
           "scan_interval": "Polling interval",
-          "current_temperature_register": "Current temperature source"
+          "current_temperature_register": "Current temperature source",
+          "weather_entity": "Hourly weather forecast",
+          "indoor_temperature_entity": "Indoor temperature sensor"
         },
-        "data_description": {"scan_interval": "Seconds between polls (5-300)."}
+        "data_description": {
+          "scan_interval": "Seconds between polls (5-300).",
+          "weather_entity": "Optional. Must support hourly forecasts for predictive modes.",
+          "indoor_temperature_entity": "Optional. Used only by Predictive + indoor compensation."
+        }
       },
       "reconfigure": {
         "title": "Reconfigure KAISAI KHX",
@@ -97,28 +103,46 @@
       },
       "advanced": {
         "title": "Advanced options",
-        "description": "Choose the polling interval and which water temperature the climate entity uses as its current temperature. DHW tank temperature is available when Domestic hot water is enabled.",
+        "description": "Choose polling, climate temperature, and optional sources for predictive heating-target control. DHW tank temperature is available when Domestic hot water is enabled.",
         "data": {
           "scan_interval": "Polling interval",
-          "current_temperature_register": "Current temperature source"
+          "current_temperature_register": "Current temperature source",
+          "weather_entity": "Hourly weather forecast",
+          "indoor_temperature_entity": "Indoor temperature sensor"
         },
-        "data_description": {"scan_interval": "Seconds between polls (5-300)."}
+        "data_description": {
+          "scan_interval": "Seconds between polls (5-300).",
+          "weather_entity": "Optional. Must support hourly forecasts for predictive modes.",
+          "indoor_temperature_entity": "Optional. Used only by Predictive + indoor compensation."
+        }
       }
     }
   },
   "entity": {
     "climate": {"climate": {"name": "Climate"}},
     "switch": {
-      "power": {"name": "Power"},
-      "heat_curve": {"name": "Heat curve"}
+      "power": {"name": "Power"}
     },
-    "select": {"operating_mode": {"name": "Operating mode"}},
+    "select": {
+      "operating_mode": {"name": "Operating mode"},
+      "heat_curve_mode": {
+        "name": "Heat curve mode",
+        "state": {
+          "manual": "Manual",
+          "ambient_heat_curve": "Ambient heat curve",
+          "predictive_heat_curve": "Predictive heat curve",
+          "predictive_indoor": "Predictive + indoor compensation"
+        }
+      }
+    },
     "number": {
       "dhw_target_temperature": {"name": "Domestic hot water target temperature"},
       "heat_curve_starting_point": {"name": "Ambient temperature starting point"},
       "heat_curve_curve": {"name": "Ambient temperature curve"},
       "heat_curve_high_limit": {"name": "Heat curve high limit"},
-      "heat_curve_low_limit": {"name": "Heat curve low limit"}
+      "heat_curve_low_limit": {"name": "Heat curve low limit"},
+      "prediction_horizon": {"name": "Prediction horizon"},
+      "indoor_target_temperature": {"name": "Indoor target temperature"}
     },
     "binary_sensor": {"fault": {"name": "Fault"}},
     "sensor": {
@@ -147,7 +171,21 @@
       "active_profile": {"name": "Active profile"},
       "last_successful_update": {"name": "Last successful update"},
       "failed_poll_count": {"name": "Failed poll count"},
-      "target_temperature": {"name": "Target temperature"}
+      "target_temperature": {"name": "Target temperature"},
+      "heat_curve_status": {
+        "name": "Heat curve status",
+        "state": {
+          "manual": "Manual",
+          "active": "Active",
+          "fallback": "Fallback",
+          "suspended": "Suspended",
+          "write_error": "Write error"
+        }
+      },
+      "calculated_heating_target": {"name": "Calculated heating target"},
+      "effective_ambient_temperature": {"name": "Effective ambient temperature"},
+      "forecast_temperature": {"name": "Forecast temperature"},
+      "indoor_correction": {"name": "Indoor correction"}
     }
   },
   "exceptions": {
