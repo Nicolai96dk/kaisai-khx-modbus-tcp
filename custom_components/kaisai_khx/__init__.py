@@ -2,9 +2,11 @@
 
 from dataclasses import replace
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.storage import Store
 from modbus_connection import ModbusError
 from modbus_connection.pymodbus import connect_tcp
 
@@ -38,6 +40,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import KaisaiConfigEntry, KaisaiCoordinator
+from .heat_curve import HEAT_CURVE_STORAGE_VERSION, heat_curve_storage_key
 from .models import GENERIC_PROFILE_ID
 from .profile import get_builtin_profile, profile_for_capabilities, profile_with_overrides
 
@@ -98,6 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
     device = KaisaiKhxDevice(connection.for_unit(entry.data.get(CONF_UNIT_ID, DEFAULT_UNIT_ID)), profile)
     coordinator = KaisaiCoordinator(hass, entry, connection, device, profile)
     entry.runtime_data = coordinator
+    await coordinator.async_load_heat_curve()
     await coordinator.async_config_entry_first_refresh()
     entry.async_on_unload(
         connection.on_connection_lost(lambda: hass.config_entries.async_schedule_reload(entry.entry_id))
@@ -108,3 +112,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
 
 async def async_unload_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bool:
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove persistent heat-curve settings with the config entry."""
+    await Store[dict[str, object]](
+        hass,
+        HEAT_CURVE_STORAGE_VERSION,
+        heat_curve_storage_key(entry.entry_id),
+    ).async_remove()

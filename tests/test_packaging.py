@@ -44,6 +44,15 @@ def test_hacs_and_translation_metadata() -> None:
     }
     assert "active_fault" in strings["entity"]["sensor"]
     assert "fault" in strings["entity"]["binary_sensor"]
+    assert "heat_curve" in strings["entity"]["switch"]
+    assert {
+        "heat_curve_starting_point",
+        "heat_curve_curve",
+        "heat_curve_high_limit",
+        "heat_curve_low_limit",
+    } <= strings["entity"]["number"].keys()
+    assert "invalid_heat_curve_limits" in strings["exceptions"]
+    assert "invalid_heat_curve_value" in strings["exceptions"]
     assert (ROOT / "custom_components/kaisai_khx/brand/icon.png").is_file()
     assert hacs["zip_release"] is True
     assert hacs["filename"] == "kaisai_khx.zip"
@@ -107,8 +116,8 @@ def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.3.1"
-    assert 'VERSION = "0.3.1"' in const_source
+    assert manifest["version"] == "0.4.0"
+    assert 'VERSION = "0.4.0"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
 
 
@@ -138,3 +147,7 @@ def test_no_generic_write_surface_exists() -> None:
     assert "async_register_service" not in source
     assert "write_register_service" not in source
     assert "SEMANTIC_WRITE_ALLOWLIST" in (integration / "profile.py").read_text()
+    heat_curve = (integration / "heat_curve.py").read_text()
+    coordinator = (integration / "coordinator.py").read_text()
+    assert 'self.profile.heat_target_key, target' in coordinator
+    assert "write_register" not in heat_curve

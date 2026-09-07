@@ -4,7 +4,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "kaisai_khx"
 NAME = "Kaisai KHX Modbus TCP"
-VERSION = "0.3.1"
+VERSION = "0.4.0"
 PLATFORMS = [
     Platform.CLIMATE,
     Platform.SENSOR,

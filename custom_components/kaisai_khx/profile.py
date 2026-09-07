@@ -265,7 +265,7 @@ _COMMON_REGISTERS: dict[str, RegisterDefinition] = {
         "Heating target temperature",
         writable=True,
         minimum=10,
-        maximum=35,
+        maximum=50,
         step=0.5,
     ),
     "cooling_target_temperature": _temp(
