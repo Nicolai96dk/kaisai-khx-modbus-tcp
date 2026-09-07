@@ -4,7 +4,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "kaisai_khx"
 NAME = "Kaisai KHX Modbus TCP"
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 PLATFORMS = [
     Platform.CLIMATE,
     Platform.SENSOR,
@@ -38,6 +38,8 @@ CONF_SCAN_INTERVAL = "scan_interval"
 CONF_TIMEOUT = "timeout"
 CONF_MESSAGE_SPACING = "message_spacing"
 CONF_CURRENT_TEMP_KEY = "current_temperature_register"
+CONF_WEATHER_ENTITY = "weather_entity"
+CONF_INDOOR_TEMPERATURE_ENTITY = "indoor_temperature_entity"
 CONF_CUSTOM_REGISTERS = "custom_registers"
 
 DEFAULT_PORT = 502

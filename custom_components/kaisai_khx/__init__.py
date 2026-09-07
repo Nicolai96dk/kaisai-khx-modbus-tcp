@@ -6,6 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from modbus_connection import ModbusError
 from modbus_connection.pymodbus import connect_tcp
@@ -37,6 +38,7 @@ from .const import (
     DEFAULT_PROFILE,
     DEFAULT_TIMEOUT,
     DEFAULT_UNIT_ID,
+    DOMAIN,
     PLATFORMS,
 )
 from .coordinator import KaisaiConfigEntry, KaisaiCoordinator
@@ -103,6 +105,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
     entry.runtime_data = coordinator
     await coordinator.async_load_heat_curve()
     await coordinator.async_config_entry_first_refresh()
+    entity_registry = er.async_get(hass)
+    if old_heat_curve_switch := entity_registry.async_get_entity_id(
+        "switch",
+        DOMAIN,
+        f"{entry.entry_id}_heat_curve_enabled",
+    ):
+        entity_registry.async_remove(old_heat_curve_switch)
     entry.async_on_unload(
         connection.on_connection_lost(lambda: hass.config_entries.async_schedule_reload(entry.entry_id))
     )

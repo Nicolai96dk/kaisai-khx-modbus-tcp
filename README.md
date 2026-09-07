@@ -72,7 +72,7 @@ The authors and contributors accept no responsibility for damage, loss, injury, 
 
 For a manual installation, copy `custom_components/kaisai_khx` into Home Assistant's `custom_components` directory and restart.
 
-Setup asks for the gateway connection, one of the three exact models, and the features to enable. On the first screen, **Gateway host/IP** is the address of the external RS485 gateway—not an address belonging to the heat pump. The port is the gateway's Modbus TCP listening port, normally `502`, and Unit ID is the KHX Modbus RTU slave address, normally `1`. Setup then offers two advanced choices: polling interval and the climate entity's current-temperature source. The source can be water inlet, water outlet (default), or DHW tank temperature when DHW is enabled.
+Setup asks for the gateway connection, one of the three exact models, and the features to enable. On the first screen, **Gateway host/IP** is the address of the external RS485 gateway—not an address belonging to the heat pump. The port is the gateway's Modbus TCP listening port, normally `502`, and Unit ID is the KHX Modbus RTU slave address, normally `1`. Advanced options include the polling interval, the climate entity's current-temperature source, an optional Home Assistant weather entity for predictive control, and an optional indoor temperature sensor for indoor compensation. The climate source can be water inlet, water outlet (default), or DHW tank temperature when DHW is enabled.
 
 The feature page supports Heating, Cooling, optional DHW, monitoring-only operation, a separate power switch, actual power-state readback, fault monitoring, individual fault sensors, performance diagnostics, hardware input/output diagnostics, the read-only maximum outlet-temperature diagnostic, connection diagnostics, and **Debug diagnostics**. Debug diagnostics enables every applicable diagnostic entity for the selected model without expanding write access. Fan 2 remains model-controlled.
 
@@ -131,13 +131,15 @@ The integration provides climate control (`off`, `heat`, `cool`), inlet/outlet/a
 
 ### Heat curve
 
-When heating control is enabled, the device provides five persistent configuration entities:
+When heating control is enabled, the device provides persistent configuration entities:
 
-- **Heat curve** enables or disables automatic heating-target control;
+- **Heat curve mode** selects **Manual**, **Ambient heat curve**, **Predictive heat curve**, or **Predictive + indoor compensation**;
 - **Ambient temperature starting point** sets the target at an ambient temperature of 0 °C (`30 °C` by default, range `10–50 °C`);
 - **Ambient temperature curve** sets the curve slope (`0.40` by default, range `0.00–1.00` in steps of `0.01`);
 - **Heat curve high limit** caps the calculated target (`35 °C` by default, range `10–50 °C`);
-- **Heat curve low limit** sets its floor (`20 °C` by default, range `10–50 °C`).
+- **Heat curve low limit** sets its floor (`20 °C` by default, range `10–50 °C`);
+- **Prediction horizon** selects `1–12` hours ahead (`8` by default);
+- **Indoor target temperature** selects `15–25 °C` (`21 °C` by default).
 
 The calculation is:
 
@@ -147,7 +149,13 @@ heating target = ambient temperature × (ambient temperature curve × -1) + star
 
 The result is constrained by the low and high limits and rounded to the active model profile's heating-target step. The profile's safe target range is also enforced. The low limit cannot be set above the high limit. Settings are stored separately for each configured heat pump and survive Home Assistant restarts.
 
-The integration writes the calculated value only when **Heat curve** is on, the heat pump is powered on, and its operating mode is **Heating**. It writes again only when the rounded calculated target differs from the target read from the controller. Manual changes made while the curve is enabled can therefore be replaced on the next update. Turning the curve off stops automatic writes and leaves the latest target unchanged.
+**Ambient heat curve** uses the KHX ambient sensor directly. **Predictive heat curve** uses the time-weighted average from the current KHX ambient temperature through the selected horizon, based on the selected Home Assistant weather entity's hourly forecast. **Predictive + indoor compensation** adds a deliberately slow room correction of `1 °C` water target per `1 °C` room error, limited to `±2 °C`. The weather entity and optional indoor temperature sensor are selected in Advanced options.
+
+If an hourly forecast is unavailable, predictive control falls back to the KHX ambient curve. If the indoor sensor is unavailable, indoor compensation is omitted. If no usable outdoor temperature remains, control is suspended and no write is sent. The **Heat curve status** sensor exposes the selected and effective modes, explanation, fallback reason, inputs, limits, calculated target, and last write. Separate diagnostic sensors expose the calculated target, effective ambient temperature, forecast temperature, and indoor correction.
+
+The integration writes the calculated value only when an automatic mode is selected, the heat pump is powered on, and its operating mode is **Heating**. It writes again only when the rounded calculated target differs from the target read from the controller. Manual changes made while an automatic mode is enabled can therefore be replaced on the next update. Selecting **Manual** stops automatic writes and leaves the latest target unchanged.
+
+Forecasts are read through Home Assistant's standard `weather.get_forecasts` action with `type: hourly`; the integration never contacts MET.no or another forecast provider directly. MET.no supports hourly forecasts, but any Home Assistant weather entity providing hourly forecasts can be selected.
 
 Fault registers 2081, 2082, 2083, 2085–2090 are decoded into:
 
