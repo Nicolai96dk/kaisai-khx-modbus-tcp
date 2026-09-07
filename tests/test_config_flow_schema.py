@@ -61,5 +61,5 @@ def test_post_setup_advanced_form_tracks_dhw_feature() -> None:
         "weather_entity",
         "indoor_temperature_entity",
     ]
-    assert without_dhw[2]["selector"]["entity"]["domain"] == "weather"
-    assert without_dhw[3]["selector"]["entity"]["domain"] == "sensor"
+    assert without_dhw[2]["selector"]["entity"]["domain"] == ["weather"]
+    assert without_dhw[3]["selector"]["entity"]["domain"] == ["sensor"]
