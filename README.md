@@ -129,6 +129,26 @@ Connect the gateway's RS485 terminals to the KHX RS485 bus according to the KHX 
 
 The integration provides climate control (`off`, `heat`, `cool`), inlet/outlet/ambient temperatures, compressor frequency, operating status, model-aware fan diagnostics, and optional DHW entities.
 
+### Heat curve
+
+When heating control is enabled, the device provides five persistent configuration entities:
+
+- **Heat curve** enables or disables automatic heating-target control;
+- **Ambient temperature starting point** sets the target at an ambient temperature of 0 °C (`30 °C` by default, range `10–50 °C`);
+- **Ambient temperature curve** sets the curve slope (`0.40` by default, range `0.00–1.00` in steps of `0.01`);
+- **Heat curve high limit** caps the calculated target (`35 °C` by default, range `10–50 °C`);
+- **Heat curve low limit** sets its floor (`20 °C` by default, range `10–50 °C`).
+
+The calculation is:
+
+```text
+heating target = ambient temperature × (ambient temperature curve × -1) + starting point
+```
+
+The result is constrained by the low and high limits and rounded to the active model profile's heating-target step. The profile's safe target range is also enforced. The low limit cannot be set above the high limit. Settings are stored separately for each configured heat pump and survive Home Assistant restarts.
+
+The integration writes the calculated value only when **Heat curve** is on, the heat pump is powered on, and its operating mode is **Heating**. It writes again only when the rounded calculated target differs from the target read from the controller. Manual changes made while the curve is enabled can therefore be replaced on the next update. Turning the curve off stops automatic writes and leaves the latest target unchanged.
+
 Fault registers 2081, 2082, 2083, 2085–2090 are decoded into:
 
 - an enabled **Fault** problem binary sensor;
@@ -153,6 +173,8 @@ Profiles never authorize Modbus writes. The integration has a hard-coded semanti
 - DHW target temperature.
 
 Every permitted value is checked against the active built-in profile and hard integration-level sanity limits. Factory, installer, compressor, EEV, defrost, fan, electrical, phase, protection, fault, status, and arbitrary registers remain read-only even if a manual labels them read/write. Register 1238 is never exposed as a writable Number. No arbitrary-register editor, test, or write service is exposed in the UI.
+
+Heat-curve control does not expand the allowlist: it can write only the existing `heating_target_temperature` semantic control, through the same profile limits, integration-level safety limits, encoding, and readback verification as a manual climate target change.
 
 Power commands are sent to 1011. When optional actual-state register 2011 is readable, it is used for confirmation with a bounded transition delay; otherwise confirmation safely falls back to 1011. A readable mismatch that persists after the retry window is reported as a failed write.
 

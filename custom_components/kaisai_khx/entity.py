@@ -1,5 +1,6 @@
 """Base entity for KAISAI KHX."""
 
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import KaisaiCoordinator
@@ -17,3 +18,13 @@ class KaisaiEntity(CoordinatorEntity[KaisaiCoordinator]):
     @property
     def available(self) -> bool:
         return self.coordinator.communication_available and super().available
+
+
+class KaisaiLocalConfigEntity(KaisaiEntity):
+    """A persistent local control that remains usable while Modbus is offline."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    @property
+    def available(self) -> bool:
+        return True

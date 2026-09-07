@@ -24,6 +24,12 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: KaisaiC
         },
         "last_successful_update": c.last_successful_update,
         "failed_poll_count": c.failed_poll_count,
+        "heat_curve": {
+            "settings": c.heat_curve.as_dict(),
+            "last_calculated_target": c.heat_curve_last_target,
+            "last_written_target": c.heat_curve_last_written_target,
+            "last_error": c.heat_curve_last_error,
+        },
         "available_registers": sorted(k for k, v in (c.data or {}).items() if v is not None),
         "unavailable_optional_registers": c.unavailable_optional_registers,
         "faults": {

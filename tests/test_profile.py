@@ -28,11 +28,14 @@ def test_signed_temperature_and_sentinel() -> None:
 
 
 def test_climate_target_defaults() -> None:
-    for key in ("heating_target_temperature", "cooling_target_temperature"):
-        target = BUILTIN_PROFILE.registers[key]
-        assert target.minimum == 10
-        assert target.maximum == 35
-        assert target.step == 0.5
+    heating_target = BUILTIN_PROFILE.registers["heating_target_temperature"]
+    assert heating_target.minimum == 10
+    assert heating_target.maximum == 50
+    assert heating_target.step == 0.5
+    cooling_target = BUILTIN_PROFILE.registers["cooling_target_temperature"]
+    assert cooling_target.minimum == 10
+    assert cooling_target.maximum == 35
+    assert cooling_target.step == 0.5
     assert BUILTIN_PROFILE.registers["dhw_target_temperature"].maximum == 60
 
 

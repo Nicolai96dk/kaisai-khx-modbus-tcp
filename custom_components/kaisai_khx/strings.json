@@ -108,9 +108,18 @@
   },
   "entity": {
     "climate": {"climate": {"name": "Climate"}},
-    "switch": {"power": {"name": "Power"}},
+    "switch": {
+      "power": {"name": "Power"},
+      "heat_curve": {"name": "Heat curve"}
+    },
     "select": {"operating_mode": {"name": "Operating mode"}},
-    "number": {"dhw_target_temperature": {"name": "Domestic hot water target temperature"}},
+    "number": {
+      "dhw_target_temperature": {"name": "Domestic hot water target temperature"},
+      "heat_curve_starting_point": {"name": "Ambient temperature starting point"},
+      "heat_curve_curve": {"name": "Ambient temperature curve"},
+      "heat_curve_high_limit": {"name": "Heat curve high limit"},
+      "heat_curve_low_limit": {"name": "Heat curve low limit"}
+    },
     "binary_sensor": {"fault": {"name": "Fault"}},
     "sensor": {
       "water_inlet_temperature": {"name": "Water inlet temperature"},
@@ -139,6 +148,14 @@
       "last_successful_update": {"name": "Last successful update"},
       "failed_poll_count": {"name": "Failed poll count"},
       "target_temperature": {"name": "Target temperature"}
+    }
+  },
+  "exceptions": {
+    "invalid_heat_curve_limits": {
+      "message": "Heat curve low limit ({low} °C) cannot be higher than its high limit ({high} °C)."
+    },
+    "invalid_heat_curve_value": {
+      "message": "The heat curve value is outside its permitted range."
     }
   }
 }
