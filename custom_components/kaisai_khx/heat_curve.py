@@ -17,6 +17,7 @@ class HeatCurveMode(StrEnum):
     AMBIENT = "ambient_heat_curve"
     PREDICTIVE = "predictive_heat_curve"
     PREDICTIVE_INDOOR = "predictive_indoor"
+    ADAPTIVE = "adaptive_learning"
 
 
 type HeatCurveSetting = Literal[

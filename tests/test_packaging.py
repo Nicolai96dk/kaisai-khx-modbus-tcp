@@ -48,6 +48,7 @@ def test_hacs_and_translation_metadata() -> None:
     assert "fault" in strings["entity"]["binary_sensor"]
     assert "heat_curve" not in strings["entity"]["switch"]
     assert "heat_curve_mode" in strings["entity"]["select"]
+    assert "reset_adaptive_learning" in strings["entity"]["button"]
     assert {
         "heat_curve_starting_point",
         "heat_curve_curve",
@@ -62,6 +63,9 @@ def test_hacs_and_translation_metadata() -> None:
         "effective_ambient_temperature",
         "forecast_temperature",
         "indoor_correction",
+        "learned_correction",
+        "adaptive_learning_confidence",
+        "adaptive_learning_phase",
     } <= strings["entity"]["sensor"].keys()
     assert "invalid_heat_curve_limits" in strings["exceptions"]
     assert "invalid_heat_curve_value" in strings["exceptions"]
@@ -128,8 +132,8 @@ def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.5.0"
-    assert 'VERSION = "0.5.0"' in const_source
+    assert manifest["version"] == "0.6.0"
+    assert 'VERSION = "0.6.0"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
 
 
@@ -163,3 +167,6 @@ def test_no_generic_write_surface_exists() -> None:
     coordinator = (integration / "coordinator.py").read_text()
     assert 'self.profile.heat_target_key, target' in coordinator
     assert "write_register" not in heat_curve
+    button = (integration / "button.py").read_text()
+    assert "device.write" not in button
+    assert "async_reset_adaptive_learning" in button

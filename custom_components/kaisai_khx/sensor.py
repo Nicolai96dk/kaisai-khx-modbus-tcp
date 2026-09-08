@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
-from homeassistant.const import EntityCategory, UnitOfFrequency, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfFrequency, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -158,6 +158,14 @@ async def async_setup_entry(
                     "indoor_correction",
                     "heat_curve_indoor_correction",
                 ),
+                HeatCurveValueSensor(
+                    coordinator,
+                    "learned_correction",
+                    "learned_correction",
+                    "heat_curve_learned_correction",
+                ),
+                AdaptiveLearningConfidenceSensor(coordinator),
+                AdaptiveLearningPhaseSensor(coordinator),
             ]
         )
     async_add_entities(entities)
@@ -241,6 +249,7 @@ class HeatCurveStatusSensor(KaisaiLocalConfigEntity, SensorEntity):
         "manual",
         "active",
         "fallback",
+        "learning",
         "suspended",
         "write_error",
     ]
@@ -273,3 +282,35 @@ class HeatCurveValueSensor(KaisaiLocalConfigEntity, SensorEntity):
     @property
     def native_value(self) -> float | None:
         return getattr(self.coordinator, self._coordinator_attribute)
+
+
+class AdaptiveLearningConfidenceSensor(KaisaiLocalConfigEntity, SensorEntity):
+    """Expose confidence in the learned correction at the current temperature."""
+
+    _attr_translation_key = "adaptive_learning_confidence"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "adaptive_learning_confidence")
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.heat_curve_learning_confidence
+
+
+class AdaptiveLearningPhaseSensor(KaisaiLocalConfigEntity, SensorEntity):
+    """Expose the current adaptive-learning phase."""
+
+    _attr_translation_key = "adaptive_learning_phase"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options: ClassVar[list[str]] = ["paused", "observing", "blending", "active"]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "adaptive_learning_phase")
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.heat_curve_learning_phase

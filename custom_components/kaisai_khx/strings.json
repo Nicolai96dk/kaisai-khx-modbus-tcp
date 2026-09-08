@@ -52,7 +52,7 @@
         "data_description": {
           "scan_interval": "Seconds between polls (5-300).",
           "weather_entity": "Optional. Must support hourly forecasts for predictive modes.",
-          "indoor_temperature_entity": "Optional. Used only by Predictive + indoor compensation."
+          "indoor_temperature_entity": "Optional. Used by Predictive + indoor compensation and required for Adaptive learning."
         }
       },
       "reconfigure": {
@@ -113,7 +113,7 @@
         "data_description": {
           "scan_interval": "Seconds between polls (5-300).",
           "weather_entity": "Optional. Must support hourly forecasts for predictive modes.",
-          "indoor_temperature_entity": "Optional. Used only by Predictive + indoor compensation."
+          "indoor_temperature_entity": "Optional. Used by Predictive + indoor compensation and required for Adaptive learning."
         }
       }
     }
@@ -123,6 +123,9 @@
     "switch": {
       "power": {"name": "Power"}
     },
+    "button": {
+      "reset_adaptive_learning": {"name": "Reset adaptive learning"}
+    },
     "select": {
       "operating_mode": {"name": "Operating mode"},
       "heat_curve_mode": {
@@ -131,7 +134,8 @@
           "manual": "Manual",
           "ambient_heat_curve": "Ambient heat curve",
           "predictive_heat_curve": "Predictive heat curve",
-          "predictive_indoor": "Predictive + indoor compensation"
+          "predictive_indoor": "Predictive + indoor compensation",
+          "adaptive_learning": "Adaptive learning"
         }
       }
     },
@@ -178,6 +182,7 @@
           "manual": "Manual",
           "active": "Active",
           "fallback": "Fallback",
+          "learning": "Learning",
           "suspended": "Suspended",
           "write_error": "Write error"
         }
@@ -185,7 +190,18 @@
       "calculated_heating_target": {"name": "Calculated heating target"},
       "effective_ambient_temperature": {"name": "Effective ambient temperature"},
       "forecast_temperature": {"name": "Forecast temperature"},
-      "indoor_correction": {"name": "Indoor correction"}
+      "indoor_correction": {"name": "Indoor correction"},
+      "learned_correction": {"name": "Learned correction"},
+      "adaptive_learning_confidence": {"name": "Adaptive learning confidence"},
+      "adaptive_learning_phase": {
+        "name": "Adaptive learning phase",
+        "state": {
+          "paused": "Paused",
+          "observing": "Observing",
+          "blending": "Blending",
+          "active": "Active"
+        }
+      }
     }
   },
   "exceptions": {
