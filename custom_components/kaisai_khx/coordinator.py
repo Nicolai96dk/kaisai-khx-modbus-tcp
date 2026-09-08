@@ -27,6 +27,12 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import TemperatureConverter
 from modbus_connection import ModbusConnection, ModbusError
 
+from .adaptive import (
+    ADAPTIVE_CORRECTION_LIMIT,
+    ADAPTIVE_STORAGE_VERSION,
+    AdaptiveLearningModel,
+    adaptive_storage_key,
+)
 from .api import KaisaiKhxDevice
 from .const import (
     CONF_CONNECTION_DIAGNOSTICS,
@@ -107,6 +113,9 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.heat_curve_effective_ambient: float | None = None
         self.heat_curve_forecast_temperature: float | None = None
         self.heat_curve_indoor_correction: float | None = None
+        self.heat_curve_learned_correction: float | None = None
+        self.heat_curve_learning_confidence = 0
+        self.heat_curve_learning_phase = "paused"
         self._forecast_points: list[tuple[datetime, float]] = []
         self._forecast_last_attempt = float("-inf")
         self._forecast_last_success: datetime | None = None
@@ -117,6 +126,12 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             HEAT_CURVE_STORAGE_VERSION,
             heat_curve_storage_key(entry.entry_id),
+        )
+        self.adaptive_learning = AdaptiveLearningModel()
+        self._adaptive_store: Store[dict[str, Any]] = Store(
+            hass,
+            ADAPTIVE_STORAGE_VERSION,
+            adaptive_storage_key(entry.entry_id),
         )
         self.device_info = DeviceInfo(
             # The entry remains the same physical HA device when its network
@@ -179,11 +194,14 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self.config_entry.options.get(CONF_INDOOR_TEMPERATURE_ENTITY)
 
     async def async_load_heat_curve(self) -> None:
-        """Load this device's persistent heat-curve configuration."""
+        """Load this device's persistent heat-curve and learning state."""
         stored = await self._heat_curve_store.async_load()
         self.heat_curve = HeatCurveSettings.from_dict(stored)
         if isinstance(stored, dict) and "mode" not in stored:
             await self._heat_curve_store.async_save(self.heat_curve.as_dict())
+        self.adaptive_learning = AdaptiveLearningModel.from_dict(
+            await self._adaptive_store.async_load()
+        )
 
     async def async_set_heat_curve_setting(
         self, setting: HeatCurveSetting, value: str | float
@@ -209,6 +227,38 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.heat_curve = updated
         await self.async_apply_heat_curve(self.data or {})
         self.async_update_listeners()
+
+    async def async_reset_adaptive_learning(self) -> None:
+        """Clear learned corrections without changing heat-curve settings."""
+        self.adaptive_learning = AdaptiveLearningModel()
+        self.heat_curve_learned_correction = 0.0
+        self.heat_curve_learning_confidence = 0
+        self.heat_curve_learning_phase = (
+            "observing" if self.heat_curve.mode is HeatCurveMode.ADAPTIVE else "paused"
+        )
+        await self._adaptive_store.async_remove()
+        self.heat_curve_status_details.update(
+            {
+                "learning_phase": self.heat_curve_learning_phase,
+                "learning_confidence": 0,
+                "learning_samples": 0,
+                "learning_updates": 0,
+                "learned_correction": 0.0,
+                "learning_last_update": None,
+                "learning_last_room_error": None,
+                "learning_last_adjustment": None,
+            }
+        )
+        self.async_update_listeners()
+
+    async def async_remove_persistent_control_data(self) -> None:
+        """Remove local control data and cancel any delayed learning save."""
+        await self._heat_curve_store.async_remove()
+        await self._adaptive_store.async_remove()
+
+    async def async_flush_adaptive_learning(self) -> None:
+        """Persist the latest coalesced learning state before an entry reload."""
+        await self._adaptive_store.async_save(self.adaptive_learning.as_dict())
 
     @property
     def communication_available(self) -> bool:
@@ -274,6 +324,16 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.heat_curve_effective_ambient = None
         self.heat_curve_forecast_temperature = None
         self.heat_curve_indoor_correction = None
+        initial_estimate = (
+            self.adaptive_learning.estimate(ambient) if ambient is not None else None
+        )
+        self.heat_curve_learned_correction = (
+            initial_estimate.correction if initial_estimate is not None else 0.0
+        )
+        self.heat_curve_learning_confidence = (
+            initial_estimate.confidence if initial_estimate is not None else 0
+        )
+        self.heat_curve_learning_phase = "paused"
 
         if selected_mode is HeatCurveMode.MANUAL:
             self._set_heat_curve_status(
@@ -316,8 +376,14 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         forecast_target_time: datetime | None = None
         indoor_temperature: float | None = None
         indoor_correction = 0.0
+        forecast_available = False
+        indoor_available = False
 
-        if selected_mode in (HeatCurveMode.PREDICTIVE, HeatCurveMode.PREDICTIVE_INDOOR):
+        if selected_mode in (
+            HeatCurveMode.PREDICTIVE,
+            HeatCurveMode.PREDICTIVE_INDOOR,
+            HeatCurveMode.ADAPTIVE,
+        ):
             await self._async_refresh_forecast()
             if self.heat_curve.mode is not selected_mode:
                 return
@@ -328,6 +394,7 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 horizon_hours=self.heat_curve.prediction_horizon,
             )
             if prediction is not None:
+                forecast_available = True
                 effective_temperature = prediction.effective_temperature
                 self.heat_curve_forecast_temperature = prediction.forecast_temperature
                 forecast_target_time = prediction.target_time
@@ -352,7 +419,7 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             return
 
-        if selected_mode is HeatCurveMode.PREDICTIVE_INDOOR:
+        if selected_mode in (HeatCurveMode.PREDICTIVE_INDOOR, HeatCurveMode.ADAPTIVE):
             indoor_temperature = self._read_indoor_temperature()
             correction = indoor_temperature_correction(self.heat_curve, indoor_temperature)
             if correction is None:
@@ -362,6 +429,7 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     else "indoor_temperature_unavailable"
                 )
             else:
+                indoor_available = True
                 indoor_correction = correction
                 self.heat_curve_indoor_correction = correction
                 if effective_mode == HeatCurveMode.AMBIENT.value:
@@ -396,25 +464,85 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ambient_temperature=ambient,
             )
             return
+
+        base_target = calculation.target
+        learned_correction_applied = 0.0
+        if selected_mode is HeatCurveMode.ADAPTIVE:
+            estimate = self.adaptive_learning.estimate(effective_temperature)
+            self.heat_curve_learned_correction = estimate.correction
+            self.heat_curve_learning_confidence = estimate.confidence
+            if forecast_available and indoor_available and indoor_temperature is not None:
+                if self.adaptive_learning.observe(
+                    now=dt_util.utcnow(),
+                    effective_ambient=effective_temperature,
+                    indoor_temperature=indoor_temperature,
+                    indoor_target=self.heat_curve.indoor_target,
+                    response_hours=self.heat_curve.prediction_horizon,
+                ):
+                    self._adaptive_store.async_delay_save(
+                        lambda: self.adaptive_learning.as_dict(),
+                        30,
+                    )
+                estimate = self.adaptive_learning.estimate(effective_temperature)
+                learned_correction_applied = round(
+                    estimate.correction * estimate.confidence / 100,
+                    2,
+                )
+                self.heat_curve_learned_correction = estimate.correction
+                self.heat_curve_learning_confidence = estimate.confidence
+                self.heat_curve_learning_phase = estimate.phase
+                effective_mode = HeatCurveMode.ADAPTIVE.value
+                calculation = calculate_heat_curve(
+                    self.heat_curve,
+                    effective_temperature,
+                    indoor_correction=indoor_correction + learned_correction_applied,
+                    step=definition.step or 0.5,
+                    step_origin=definition.minimum or 0.0,
+                    target_minimum=definition.minimum,
+                    target_maximum=definition.maximum,
+                )
+                if calculation is None:
+                    self._set_heat_curve_status(
+                        "suspended",
+                        reason="invalid_effective_limits",
+                        explanation="The configured limits do not permit a safe heating target",
+                        ambient_temperature=ambient,
+                    )
+                    return
+            else:
+                self.heat_curve_learning_phase = "paused"
         target = calculation.target
         self.heat_curve_last_target = target
         self.heat_curve_effective_ambient = effective_temperature
 
         status = "fallback" if fallback_reason else "active"
+        status_reason = fallback_reason or "active"
         if fallback_reason:
             explanation = self._fallback_explanation(fallback_reason, effective_mode)
+        elif selected_mode is HeatCurveMode.ADAPTIVE and self.heat_curve_learning_phase == "observing":
+            status = "learning"
+            status_reason = "learning_observing"
+            explanation = "Adaptive learning is observing the delayed indoor response"
+        elif selected_mode is HeatCurveMode.ADAPTIVE and self.heat_curve_learning_phase == "blending":
+            status = "learning"
+            status_reason = "learning_blending"
+            explanation = "Adaptive learning is gradually blending in a bounded learned correction"
+        elif selected_mode is HeatCurveMode.ADAPTIVE:
+            explanation = "Adaptive learning is active with full confidence for this temperature range"
         else:
             explanation = "Automatic heating-target control is active"
         self._set_heat_curve_status(
             status,
             effective_mode=effective_mode,
-            reason=fallback_reason or "active",
+            reason=status_reason,
             explanation=explanation,
             ambient_temperature=ambient,
             effective_ambient_temperature=effective_temperature,
             forecast_target_time=forecast_target_time,
             indoor_temperature=indoor_temperature,
             indoor_correction=self.heat_curve_indoor_correction,
+            base_calculated_target=base_target,
+            learned_correction_applied=learned_correction_applied,
             raw_target=calculation.raw_target,
             calculated_target=target,
         )
@@ -564,6 +692,16 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "last_applied_target": self.heat_curve_last_written_target,
             "last_write_time": self.heat_curve_last_write_time,
             "last_error": self.heat_curve_last_error,
+            "learning_phase": self.heat_curve_learning_phase,
+            "learning_confidence": self.heat_curve_learning_confidence,
+            "learning_samples": self.adaptive_learning.total_samples,
+            "learning_updates": self.adaptive_learning.learning_updates,
+            "learned_correction": self.heat_curve_learned_correction,
+            "learning_correction_limit": ADAPTIVE_CORRECTION_LIMIT,
+            "learning_response_window_hours": self.heat_curve.prediction_horizon,
+            "learning_last_update": self.adaptive_learning.last_update_time,
+            "learning_last_room_error": self.adaptive_learning.last_room_error,
+            "learning_last_adjustment": self.adaptive_learning.last_adjustment,
             **details,
         }
 

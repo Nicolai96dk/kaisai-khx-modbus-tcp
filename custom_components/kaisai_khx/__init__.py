@@ -11,6 +11,7 @@ from homeassistant.helpers.storage import Store
 from modbus_connection import ModbusError
 from modbus_connection.pymodbus import connect_tcp
 
+from .adaptive import ADAPTIVE_STORAGE_VERSION, adaptive_storage_key
 from .api import KaisaiKhxDevice
 from .const import (
     CONF_BASE_PROFILE,
@@ -120,13 +121,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bool:
+    await entry.runtime_data.async_flush_adaptive_learning()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Remove persistent heat-curve settings with the config entry."""
+    """Remove persistent heat-curve and adaptive-learning data with the entry."""
+    if isinstance(runtime_data := entry.runtime_data, KaisaiCoordinator):
+        await runtime_data.async_remove_persistent_control_data()
+        return
     await Store[dict[str, object]](
         hass,
         HEAT_CURVE_STORAGE_VERSION,
         heat_curve_storage_key(entry.entry_id),
+    ).async_remove()
+    await Store[dict[str, object]](
+        hass,
+        ADAPTIVE_STORAGE_VERSION,
+        adaptive_storage_key(entry.entry_id),
     ).async_remove()
