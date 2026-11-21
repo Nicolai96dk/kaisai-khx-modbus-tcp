@@ -7,6 +7,7 @@ All notable changes to this project are documented here.
 - Added optional estimated COP and rolling seasonal performance factor sensors.
 - Added editable electrical power sensor and circulating water flow settings.
 - Used the KHX water-flow switch and circulation pump output to gate the heat estimate.
+- Allowed compatible Modbus connection library versions for newer Home Assistant releases.
 
 ## 0.6.0 — 2026-09-08
 

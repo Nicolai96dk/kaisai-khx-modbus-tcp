@@ -10,7 +10,7 @@ def test_manifest_uses_owned_modbus_connection_transport() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     assert manifest["domain"] == "kaisai_khx"
     assert "modbus_connection" not in manifest.get("dependencies", [])
-    assert "modbus-connection[pymodbus]==3.8.1" in manifest["requirements"]
+    assert "modbus-connection[pymodbus]>=3.8.1,<5" in manifest["requirements"]
 
 
 def test_hacs_and_translation_metadata() -> None:
