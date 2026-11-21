@@ -234,18 +234,7 @@
           "active": "Active"
         }
       },
-      "estimated_cop": {"name": "Live COP"},
-      "cop_status": {
-        "name": "COP",
-        "state": {
-          "heating": "Heating",
-          "no_flow": "No water flow",
-          "waiting_for_heat": "Waiting for heat",
-          "defrosting": "Defrosting",
-          "cooling": "Cooling",
-          "data_unavailable": "Data unavailable"
-        }
-      },
+      "estimated_cop": {"name": "COP"},
       "estimated_spf": {"name": "SCOP"}
     }
   },

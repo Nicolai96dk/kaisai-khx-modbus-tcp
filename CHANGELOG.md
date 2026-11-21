@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 0.7.4 — 2026-11-21
+
+- Use a single numeric COP sensor, retaining its existing entity ID and history.
+- Mark COP unavailable when there is no valid reading and retire the text-only COP entity.
+
 ## 0.7.3 — 2026-11-21
 
 - Show live COP or its operating status in one COP row, with the last valid reading and timestamp in the details.

@@ -2,8 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
-from enum import StrEnum
+from datetime import date, timedelta
 from math import isfinite
 from typing import Any
 
@@ -16,15 +15,6 @@ HEATING_STATUSES = {"heating", "hot_water", "high_temperature_disinfection", "de
 EFFICIENCY_STORAGE_VERSION = 1
 EFFICIENCY_CHECKPOINT_SECONDS = 300
 SPF_WINDOW_DAYS = 365
-
-
-class CopStatus(StrEnum):
-    HEATING = "heating"
-    NO_FLOW = "no_flow"
-    WAITING_FOR_HEAT = "waiting_for_heat"
-    DEFROSTING = "defrosting"
-    COOLING = "cooling"
-    DATA_UNAVAILABLE = "data_unavailable"
 
 
 def efficiency_storage_key(entry_id: str) -> str:
@@ -83,9 +73,6 @@ class EfficiencyTracker:
     power_sensor: str
     flow_m3h: float
     cop: float | None = field(init=False, default=None)
-    cop_status: CopStatus = field(init=False, default=CopStatus.DATA_UNAVAILABLE)
-    last_cop: float | None = field(init=False, default=None)
-    last_cop_at: str | None = field(init=False, default=None)
     _previous: tuple[float, float, float] | None = field(init=False, default=None)
     _days: dict[date, EnergyTotals] = field(init=False, default_factory=dict)
     _last_day: date | None = field(init=False, default=None)
@@ -105,14 +92,13 @@ class EfficiencyTracker:
 
     def invalidate(self) -> None:
         self.cop = None
-        self.cop_status = CopStatus.DATA_UNAVAILABLE
         self._previous = None
 
     def sample(
         self,
         now: float,
         *,
-        observed_at: datetime,
+        day: date,
         status: str | None,
         circulating: bool | None,
         heat_kw: float | None,
@@ -120,28 +106,14 @@ class EfficiencyTracker:
         max_gap_seconds: float,
     ) -> bool:
         """Record an instantaneous reading and return whether totals advanced."""
-        day = observed_at.date()
         self._advance_window(day)
-        if status == "cooling":
-            self.invalidate()
-            self.cop_status = CopStatus.COOLING
-            return False
         if status not in HEATING_STATUSES or circulating is None or heat_kw is None or power_kw is None:
             self.invalidate()
             return False
 
-        self.cop = None
-        if status == "defrosting":
-            self.cop_status = CopStatus.DEFROSTING
-        elif not circulating:
-            self.cop_status = CopStatus.NO_FLOW
-        elif heat_kw <= 0 or power_kw <= 0:
-            self.cop_status = CopStatus.WAITING_FOR_HEAT
-        else:
-            self.cop_status = CopStatus.HEATING
-            self.cop = heat_kw / power_kw
-            self.last_cop = self.cop
-            self.last_cop_at = observed_at.isoformat()
+        self.cop = (
+            heat_kw / power_kw if status != "defrosting" and circulating and heat_kw > 0 and power_kw > 0 else None
+        )
 
         previous = self._previous
         self._previous = (now, heat_kw, power_kw)
@@ -169,8 +141,6 @@ class EfficiencyTracker:
         """Resume totals for the same meter and flow calibration."""
         if not data or data.get("power_sensor") != self.power_sensor or data.get("flow_m3h") != self.flow_m3h:
             return
-        self.last_cop = _finite_number(data.get("last_cop"))
-        self.last_cop_at = data.get("last_cop_at")
         for day_key, values in data.get("days", {}).items():
             self._days[date.fromisoformat(day_key)] = EnergyTotals(
                 heat_kwh=values["heat_kwh"],
@@ -184,8 +154,6 @@ class EfficiencyTracker:
         return {
             "power_sensor": self.power_sensor,
             "flow_m3h": self.flow_m3h,
-            "last_cop": self.last_cop,
-            "last_cop_at": self.last_cop_at,
             "days": {
                 day.isoformat(): {
                     "heat_kwh": totals.heat_kwh,

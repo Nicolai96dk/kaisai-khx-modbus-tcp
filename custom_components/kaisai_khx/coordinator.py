@@ -249,7 +249,7 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         circulating = circulating_water(data, self.profile.bits)
         advanced = tracker.sample(
             now,
-            observed_at=dt_util.now(),
+            day=dt_util.now().date(),
             status=data.get("operation_status"),
             circulating=circulating,
             heat_kw=heating_power_kw(data, tracker.flow_m3h, circulating),

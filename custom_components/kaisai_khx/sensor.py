@@ -6,10 +6,11 @@ from typing import Any, ClassVar
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfFrequency, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import KaisaiConfigEntry, KaisaiCoordinator
-from .efficiency import CopStatus
 from .entity import KaisaiEntity, KaisaiLocalConfigEntity
 from .faults import raw_fault_registers
 
@@ -119,6 +120,12 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: KaisaiConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     """Create only entities applicable to the active profile."""
+    registry = er.async_get(hass)
+    if legacy_id := registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_cop_status"):
+        legacy = registry.async_get(legacy_id)
+        if legacy is not None and legacy.disabled_by is None:
+            registry.async_update_entity(legacy_id, disabled_by=er.RegistryEntryDisabler.INTEGRATION)
+
     coordinator = entry.runtime_data
     descriptions = []
     for description in DESCRIPTIONS:
@@ -174,7 +181,6 @@ async def async_setup_entry(
             (
                 KaisaiEfficiencySensor(coordinator, "estimated_cop"),
                 KaisaiEfficiencySensor(coordinator, "estimated_spf"),
-                KaisaiCopDisplaySensor(coordinator),
             )
         )
     async_add_entities(entities)
@@ -335,7 +341,6 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
         self._attr_translation_key = key
         if key == "estimated_cop":
             self._attr_state_class = SensorStateClass.MEASUREMENT
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def available(self) -> bool:
@@ -344,7 +349,7 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
             return False
         if self._key == "estimated_spf":
             return tracker.spf is not None
-        return super().available and tracker.cop_status != CopStatus.DATA_UNAVAILABLE
+        return tracker.cop is not None and super().available
 
     @property
     def native_value(self) -> float | None:
@@ -360,37 +365,11 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         tracker = self.coordinator.efficiency
-        if tracker is None:
+        if tracker is None or self._key == "estimated_cop":
             return None
-        if self._key == "estimated_cop":
-            return {"operating_status": tracker.cop_status.value}
         totals = tracker.totals
         return {
             "estimated_heat_kwh": round(totals.heat_kwh, 3),
             "electrical_energy_kwh": round(totals.electricity_kwh, 3),
             "observed_hours": round(totals.observed_hours, 2),
         }
-
-
-class KaisaiCopDisplaySensor(KaisaiEntity, SensorEntity):
-    """Display the live COP or the reason no reading is available."""
-
-    _attr_translation_key = "cop_status"
-
-    def __init__(self, coordinator: KaisaiCoordinator) -> None:
-        # Reuse the former status entity so existing installations gain one COP row.
-        super().__init__(coordinator, "cop_status")
-
-    @property
-    def native_value(self) -> str | None:
-        tracker = self.coordinator.efficiency
-        if tracker is None:
-            return None
-        return f"{tracker.cop:.1f}" if tracker.cop is not None else tracker.cop_status.value
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        tracker = self.coordinator.efficiency
-        if tracker is None or tracker.cop is not None or tracker.last_cop is None:
-            return None
-        return {"last_cop": round(tracker.last_cop, 1), "last_cop_at": tracker.last_cop_at}
