@@ -6,6 +6,9 @@ All notable changes to this project are documented here.
 
 - Prefill the efficiency setup flow with the selected model’s reference flow rate.
 - Keep any saved flow rate when reopening Configure.
+- Show the reason when live COP has no numeric reading, including when water flow has stopped.
+- Display COP and SCOP to one decimal place by default.
+- Use the native climate temperature properties on Home Assistant 2026.11 and newer.
 
 ## 0.7.1 — 2026-11-21
 

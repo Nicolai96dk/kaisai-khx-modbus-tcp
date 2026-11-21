@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import pytest
 
 from custom_components.kaisai_khx.efficiency import (
+    CopStatus,
     EfficiencyTracker,
     circulating_water,
     electrical_power_kw,
@@ -37,37 +38,74 @@ def test_heat_output_uses_configured_flow_and_preserves_defrost_loss() -> None:
     assert electrical_power_kw("unavailable", "W") is None
 
 
+@pytest.mark.parametrize(
+    ("mode", "circulating", "heat_kw", "power_kw", "status", "cop"),
+    (
+        ("heating", True, 4.0, 1.0, CopStatus.HEATING, 4.0),
+        ("heating", False, 0.0, 0.1, CopStatus.NO_FLOW, None),
+        ("heating", True, 0.0, 0.1, CopStatus.WAITING_FOR_HEAT, None),
+        ("heating", None, None, 1.0, CopStatus.DATA_UNAVAILABLE, None),
+        ("heating", True, 4.0, None, CopStatus.DATA_UNAVAILABLE, None),
+        ("defrosting", True, -2.0, 1.0, CopStatus.DEFROSTING, None),
+        ("cooling", True, -4.0, 1.0, CopStatus.COOLING, None),
+    ),
+)
+def test_cop_status_explains_when_no_numeric_value_is_available(
+    mode: str,
+    circulating: bool | None,
+    heat_kw: float | None,
+    power_kw: float | None,
+    status: CopStatus,
+    cop: float | None,
+) -> None:
+    tracker = EfficiencyTracker("sensor.power", 1.0)
+    tracker.sample(
+        0, day=TODAY, status=mode, circulating=circulating, heat_kw=heat_kw, power_kw=power_kw, max_gap_seconds=120
+    )
+
+    assert tracker.cop_status == status
+    assert tracker.cop == cop
+
+
 def test_spf_includes_standby_and_defrost_and_skips_gaps() -> None:
     tracker = EfficiencyTracker("sensor.power", 1.0)
-    tracker.sample(0, day=TODAY, status="heating", heat_kw=4, power_kw=1, max_gap_seconds=120)
+    tracker.sample(0, day=TODAY, status="heating", circulating=True, heat_kw=4, power_kw=1, max_gap_seconds=120)
     assert tracker.cop == 4
     assert tracker.spf is None
-    tracker.sample(60, day=TODAY, status="defrosting", heat_kw=-2, power_kw=1, max_gap_seconds=120)
+    tracker.sample(60, day=TODAY, status="defrosting", circulating=True, heat_kw=-2, power_kw=1, max_gap_seconds=120)
     assert tracker.cop is None
-    tracker.sample(120, day=TODAY, status="heating", heat_kw=0, power_kw=0.2, max_gap_seconds=120)
+    tracker.sample(120, day=TODAY, status="heating", circulating=False, heat_kw=0, power_kw=0.2, max_gap_seconds=120)
     assert tracker.cop is None
     assert tracker.totals.heat_kwh == pytest.approx(0)
     assert tracker.totals.electricity_kwh == pytest.approx(1.6 / 60)
     before_gap = tracker.as_dict()
 
-    tracker.sample(1000, day=TODAY, status="heating", heat_kw=4, power_kw=1, max_gap_seconds=120)
-    tracker.sample(1060, day=TODAY, status="heating", heat_kw=4, power_kw=None, max_gap_seconds=120)
-    tracker.sample(1120, day=TODAY, status="heating", heat_kw=4, power_kw=1, max_gap_seconds=120)
-    tracker.sample(1180, day=TODAY, status="cooling", heat_kw=-4, power_kw=1, max_gap_seconds=120)
-    tracker.sample(1240, day=TODAY, status="heating", heat_kw=4, power_kw=1, max_gap_seconds=120)
+    tracker.sample(1000, day=TODAY, status="heating", circulating=True, heat_kw=4, power_kw=1, max_gap_seconds=120)
+    tracker.sample(1060, day=TODAY, status="heating", circulating=True, heat_kw=4, power_kw=None, max_gap_seconds=120)
+    tracker.sample(1120, day=TODAY, status="heating", circulating=True, heat_kw=4, power_kw=1, max_gap_seconds=120)
+    tracker.sample(1180, day=TODAY, status="cooling", circulating=True, heat_kw=-4, power_kw=1, max_gap_seconds=120)
+    tracker.sample(1240, day=TODAY, status="heating", circulating=True, heat_kw=4, power_kw=1, max_gap_seconds=120)
     assert tracker.as_dict() == before_gap
 
 
 def test_spf_restores_same_calibration_and_expires_old_days() -> None:
     tracker = EfficiencyTracker("sensor.power", 1.0)
-    tracker.sample(0, day=TODAY, status="heating", heat_kw=4, power_kw=1, max_gap_seconds=120)
-    tracker.sample(60, day=TODAY, status="heating", heat_kw=4, power_kw=1, max_gap_seconds=120)
+    tracker.sample(0, day=TODAY, status="heating", circulating=True, heat_kw=4, power_kw=1, max_gap_seconds=120)
+    tracker.sample(60, day=TODAY, status="heating", circulating=True, heat_kw=4, power_kw=1, max_gap_seconds=120)
     stored = tracker.as_dict()
 
     restored = EfficiencyTracker("sensor.power", 1.0)
     restored.restore(stored, TODAY + timedelta(days=364))
     assert restored.spf == pytest.approx(4)
-    restored.sample(0, day=TODAY + timedelta(days=365), status="heating", heat_kw=4, power_kw=1, max_gap_seconds=120)
+    restored.sample(
+        0,
+        day=TODAY + timedelta(days=365),
+        status="heating",
+        circulating=True,
+        heat_kw=4,
+        power_kw=1,
+        max_gap_seconds=120,
+    )
     assert restored.spf is None
 
     recalibrated = EfficiencyTracker("sensor.power", 0.8)

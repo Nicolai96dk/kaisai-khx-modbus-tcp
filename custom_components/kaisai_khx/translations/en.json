@@ -234,8 +234,19 @@
           "active": "Active"
         }
       },
-      "estimated_cop": {"name": "Estimated COP"},
-      "estimated_spf": {"name": "Estimated seasonal performance factor"}
+      "estimated_cop": {"name": "COP"},
+      "cop_status": {
+        "name": "COP status",
+        "state": {
+          "heating": "Heating",
+          "no_flow": "No water flow",
+          "waiting_for_heat": "Waiting for heat",
+          "defrosting": "Defrosting",
+          "cooling": "Cooling",
+          "data_unavailable": "Data unavailable"
+        }
+      },
+      "estimated_spf": {"name": "SCOP"}
     }
   },
   "exceptions": {

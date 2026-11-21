@@ -165,12 +165,13 @@ Forecasts are read through Home Assistant's standard `weather.get_forecasts` act
 
 Enable **Estimate COP and seasonal efficiency** during setup or from **Settings → Devices & services → Kaisai KHX → Configure**. Select an electrical power sensor in `W` or `kW`. The circulating water flow field starts with the selected model’s reference flow in `m³/h` when available. Enter the measured flow through the heat pump while its circulation pump is running if you know it. You can change either input from **Configure**.
 
-- **Estimated COP** divides `1.16 × flow × (water outlet temperature − water inlet temperature)` by electrical input in kW. It is available during positive heat delivery with valid power and circulation readings.
-- **Estimated seasonal performance factor** divides net estimated thermal energy by electrical energy over the last 365 local calendar days, using the data collected so far. Heating, hot water and disinfection reported by the KHX are included. Defrost heat loss and electricity use during standby in a heating mode count toward the estimate. Intervals with unknown inputs or active cooling are skipped. The sensor attributes show the accumulated heat, electricity and observed hours.
+- **COP** divides `1.16 × flow × (water outlet temperature − water inlet temperature)` by electrical input in kW. It reports a number during positive heat delivery with valid power and circulation readings.
+- **COP status** explains the current reading. It shows **No water flow** when the circulation signals indicate that flow has stopped, and reports cooling, defrosting, or missing data separately. The numeric COP leaves a gap when there is no heat output to estimate.
+- **SCOP** reports the estimated seasonal performance factor (SPF) for the installation. It divides net estimated thermal energy by electrical energy over the last 365 local calendar days, using the data collected so far. Heating, hot water and disinfection reported by the KHX are included. Defrost heat loss and electricity use during standby in a heating mode count toward the estimate. Intervals with unknown inputs or active cooling are skipped. The sensor attributes show the accumulated heat, electricity and observed hours.
 
 Enabling the feature also exposes **Water-flow switch** (active-low input 2034, bit 2) and **Main circulating water pump** (output 2019, bit 4). When both readings are available they must both indicate circulation. If only one is readable, the integration uses it. With neither readable, efficiency sampling pauses.
 
-The calculation assumes water and a constant configured flow while circulating. Changing either input starts a fresh seasonal estimate. Totals survive restarts, and the seasonal result is specific to the installation. The manufacturer’s SCOP uses standardized test conditions.
+COP and SPF display one decimal place by default. The calculation assumes water and a constant configured flow while circulating. Changing either input starts a fresh seasonal estimate. Totals survive restarts, and the seasonal result is specific to the installation. The manufacturer’s SCOP uses standardized test conditions.
 
 ### Faults and diagnostics
 

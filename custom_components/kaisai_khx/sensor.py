@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import KaisaiConfigEntry, KaisaiCoordinator
+from .efficiency import CopStatus
 from .entity import KaisaiEntity, KaisaiLocalConfigEntity
 from .faults import raw_fault_registers
 
@@ -173,6 +174,7 @@ async def async_setup_entry(
             (
                 KaisaiEfficiencySensor(coordinator, "estimated_cop"),
                 KaisaiEfficiencySensor(coordinator, "estimated_spf"),
+                KaisaiCopStatusSensor(coordinator),
             )
         )
     async_add_entities(entities)
@@ -326,7 +328,7 @@ class AdaptiveLearningPhaseSensor(KaisaiLocalConfigEntity, SensorEntity):
 class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
     """Instantaneous or rolling seasonal efficiency based on estimated heat output."""
 
-    _attr_suggested_display_precision = 2
+    _attr_suggested_display_precision = 1
 
     def __init__(self, coordinator: KaisaiCoordinator, key: str) -> None:
         super().__init__(coordinator, key)
@@ -336,7 +338,12 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.native_value is not None and (self._key == "estimated_spf" or super().available)
+        tracker = self.coordinator.efficiency
+        if tracker is None:
+            return False
+        if self._key == "estimated_spf":
+            return tracker.spf is not None
+        return super().available and tracker.cop_status != CopStatus.DATA_UNAVAILABLE
 
     @property
     def native_value(self) -> float | None:
@@ -348,11 +355,29 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         tracker = self.coordinator.efficiency
-        if tracker is None or self._key != "estimated_spf":
+        if tracker is None:
             return None
+        if self._key == "estimated_cop":
+            return {"operating_status": tracker.cop_status.value}
         totals = tracker.totals
         return {
             "estimated_heat_kwh": round(totals.heat_kwh, 3),
             "electrical_energy_kwh": round(totals.electricity_kwh, 3),
             "observed_hours": round(totals.observed_hours, 2),
         }
+
+
+class KaisaiCopStatusSensor(KaisaiEntity, SensorEntity):
+    """Explain whether the integration can estimate an instantaneous COP."""
+
+    _attr_translation_key = "cop_status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options: ClassVar[list[str]] = [status.value for status in CopStatus]
+
+    def __init__(self, coordinator: KaisaiCoordinator) -> None:
+        super().__init__(coordinator, "cop_status")
+
+    @property
+    def native_value(self) -> str | None:
+        tracker = self.coordinator.efficiency
+        return tracker.cop_status.value if tracker is not None else None

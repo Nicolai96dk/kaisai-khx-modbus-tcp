@@ -246,11 +246,13 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else None
         )
         now = time.monotonic()
+        circulating = circulating_water(data, self.profile.bits)
         advanced = tracker.sample(
             now,
             day=dt_util.now().date(),
             status=data.get("operation_status"),
-            heat_kw=heating_power_kw(data, tracker.flow_m3h, circulating_water(data, self.profile.bits)),
+            circulating=circulating,
+            heat_kw=heating_power_kw(data, tracker.flow_m3h, circulating),
             power_kw=power_kw,
             max_gap_seconds=2 * self._global_interval,
         )

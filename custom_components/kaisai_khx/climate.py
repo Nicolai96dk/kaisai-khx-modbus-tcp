@@ -10,6 +10,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import KaisaiConfigEntry
 from .entity import KaisaiEntity
 
+_NATIVE_TEMPERATURE_API = hasattr(ClimateEntity, "native_temperature_unit")
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: KaisaiConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
@@ -25,7 +27,10 @@ class KaisaiClimate(KaisaiEntity, ClimateEntity):
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
     )
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    if _NATIVE_TEMPERATURE_API:
+        _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    else:
+        _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     def __init__(self, coordinator):
         super().__init__(coordinator, "climate")
@@ -45,7 +50,7 @@ class KaisaiClimate(KaisaiEntity, ClimateEntity):
         self._attr_target_temperature_step = target.step or 0.5
 
     @property
-    def current_temperature(self):
+    def native_current_temperature(self) -> float | None:
         return self.coordinator.data.get(self.coordinator.profile.current_temperature_key)
 
     @property
@@ -72,13 +77,18 @@ class KaisaiClimate(KaisaiEntity, ClimateEntity):
         )
 
     @property
-    def target_temperature(self):
+    def native_target_temperature(self) -> float | None:
         key = (
             self.coordinator.profile.cool_target_key
             if self.hvac_mode == HVACMode.COOL
             else self.coordinator.profile.heat_target_key
         )
         return self.coordinator.data.get(key)
+
+    if not _NATIVE_TEMPERATURE_API:
+        # Older Core versions read these names directly from the entity.
+        current_temperature = native_current_temperature
+        target_temperature = native_target_temperature
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode not in self.hvac_modes:
