@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 0.7.0 — 2026-11-21
+
+- Added optional estimated COP and rolling seasonal performance factor sensors.
+- Added editable electrical power sensor and circulating water flow settings.
+- Used the KHX water-flow switch and circulation pump output to gate the heat estimate.
+
 ## 0.6.0 — 2026-09-08
 
 - Added an Adaptive learning heat-curve mode that passively learns bounded corrections on top of Predictive + indoor compensation.

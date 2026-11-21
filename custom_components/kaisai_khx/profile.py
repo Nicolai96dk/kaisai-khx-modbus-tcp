@@ -352,6 +352,7 @@ _INPUT_BITS = (
     (6, "hot_water_mode_switch", "Hot-water mode switch"),
     (9, "ac_switch", "A/C switch"),
 )
+CIRCULATION_BITS = frozenset({"water_flow_switch", "main_circulating_water_pump"})
 BITS = tuple(BitDefinition(key, "output_states", bit, name) for bit, key, name in _OUTPUT_BITS) + tuple(
     BitDefinition(key, "input_states", bit, name, inverted=True) for bit, key, name in _INPUT_BITS
 )
@@ -482,6 +483,7 @@ def profile_for_capabilities(
     io_diagnostics_enabled: bool = False,
     max_outlet_diagnostic_enabled: bool = False,
     debug_diagnostics_enabled: bool = False,
+    efficiency_enabled: bool = False,
 ) -> RegisterProfile:
     """Return the model profile filtered to the selected user features."""
     disabled: set[str] = set()
@@ -511,7 +513,8 @@ def profile_for_capabilities(
                 "fan_2_speed",
             }
         )
-    if not (io_diagnostics_enabled or debug_diagnostics_enabled):
+    all_io_bits = io_diagnostics_enabled or debug_diagnostics_enabled
+    if not (all_io_bits or efficiency_enabled):
         disabled.update({"output_states", "input_states"})
     if not (max_outlet_diagnostic_enabled or debug_diagnostics_enabled):
         disabled.add("maximum_water_outlet_temperature")
@@ -519,7 +522,10 @@ def profile_for_capabilities(
     registers = MappingProxyType(
         {key: definition for key, definition in profile.registers.items() if key not in disabled}
     )
-    bits = tuple(definition for definition in profile.bits if definition.register in registers)
+    bits = tuple(
+        definition for definition in profile.bits
+        if definition.register in registers and (all_io_bits or definition.key in CIRCULATION_BITS)
+    )
     current_temperature_key = profile.current_temperature_key
     if current_temperature_key not in registers:
         current_temperature_key = "water_outlet_temperature"

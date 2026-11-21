@@ -18,7 +18,7 @@ from homeassistant.components.weather import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, UnitOfTemperature
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.storage import Store
@@ -40,6 +40,9 @@ from .const import (
     CONF_COOLING,
     CONF_DEBUG_DIAGNOSTICS,
     CONF_DHW,
+    CONF_EFFICIENCY,
+    CONF_EFFICIENCY_FLOW,
+    CONF_EFFICIENCY_POWER_SENSOR,
     CONF_FAULT_MONITORING,
     CONF_HEATING,
     CONF_INDIVIDUAL_FAULTS,
@@ -51,6 +54,15 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     FAILURES_UNTIL_UNAVAILABLE,
+)
+from .efficiency import (
+    EFFICIENCY_CHECKPOINT_SECONDS,
+    EFFICIENCY_STORAGE_VERSION,
+    EfficiencyTracker,
+    circulating_water,
+    efficiency_storage_key,
+    electrical_power_kw,
+    heating_power_kw,
 )
 from .faults import ActiveFault, decode_faults
 from .heat_curve import (
@@ -103,6 +115,11 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_successful_update: datetime | None = None
         self._global_interval = global_interval
         self._last_polled: dict[str, float] = {}
+        self.efficiency: EfficiencyTracker | None = None
+        self._efficiency_store: Store[dict[str, Any]] = Store(
+            hass, EFFICIENCY_STORAGE_VERSION, efficiency_storage_key(entry.entry_id)
+        )
+        self._last_efficiency_checkpoint = time.monotonic()
         self.heat_curve = HeatCurveSettings()
         self.heat_curve_last_target: float | None = None
         self.heat_curve_last_written_target: float | None = None
@@ -203,6 +220,44 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._adaptive_store.async_load()
         )
 
+    async def async_load_efficiency(self) -> None:
+        """Initialize the optional tracker before the first poll."""
+        options = self.config_entry.options
+        if options.get(CONF_EFFICIENCY, False):
+            tracker = EfficiencyTracker(options[CONF_EFFICIENCY_POWER_SENSOR], options[CONF_EFFICIENCY_FLOW])
+            tracker.restore(await self._efficiency_store.async_load(), dt_util.now().date())
+            self.efficiency = tracker
+
+    async def async_finish_efficiency(self, _event: Event | None = None) -> None:
+        """Stop sampling and save the latest totals on unload or shutdown."""
+        tracker = self.efficiency
+        self.efficiency = None
+        if tracker is not None:
+            await self._efficiency_store.async_save(tracker.as_dict())
+
+    def _sample_efficiency(self, data: dict[str, Any]) -> None:
+        tracker = self.efficiency
+        if tracker is None:
+            return
+        power = self.hass.states.get(tracker.power_sensor)
+        power_kw = (
+            electrical_power_kw(power.state, power.attributes.get(ATTR_UNIT_OF_MEASUREMENT))
+            if power is not None
+            else None
+        )
+        now = time.monotonic()
+        advanced = tracker.sample(
+            now,
+            day=dt_util.now().date(),
+            status=data.get("operation_status"),
+            heat_kw=heating_power_kw(data, tracker.flow_m3h, circulating_water(data, self.profile.bits)),
+            power_kw=power_kw,
+            max_gap_seconds=2 * self._global_interval,
+        )
+        if advanced and now - self._last_efficiency_checkpoint >= EFFICIENCY_CHECKPOINT_SECONDS:
+            self._last_efficiency_checkpoint = now
+            self._efficiency_store.async_delay_save(tracker.as_dict, 0)
+
     async def async_set_heat_curve_setting(
         self, setting: HeatCurveSetting, value: str | float
     ) -> None:
@@ -288,6 +343,8 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             updates = await self.device.read_all(register_keys)
         except ModbusError as exc:
+            if self.efficiency is not None:
+                self.efficiency.invalidate()
             self.failed_poll_count += 1
             if (
                 self.failed_poll_count >= FAILURES_UNTIL_UNAVAILABLE
@@ -313,6 +370,8 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_successful_update = dt_util.utcnow()
         self._last_polled.update({key: now for key in register_keys})
         data = {**(self.data or {}), **updates}
+        if register_keys:
+            self._sample_efficiency(data)
         await self.async_apply_heat_curve(data)
         return data
 

@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
@@ -20,6 +20,7 @@ from .const import (
     CONF_CUSTOM_REGISTERS,
     CONF_DEBUG_DIAGNOSTICS,
     CONF_DHW,
+    CONF_EFFICIENCY,
     CONF_ELECTRICAL_PHASE,
     CONF_FAN_2,
     CONF_FAN_COUNT,
@@ -43,6 +44,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import KaisaiConfigEntry, KaisaiCoordinator
+from .efficiency import EFFICIENCY_STORAGE_VERSION, efficiency_storage_key
 from .heat_curve import HEAT_CURVE_STORAGE_VERSION, heat_curve_storage_key
 from .models import GENERIC_PROFILE_ID
 from .profile import get_builtin_profile, profile_for_capabilities, profile_with_overrides
@@ -100,11 +102,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
         io_diagnostics_enabled=entry.options.get(CONF_IO_DIAGNOSTICS, False),
         max_outlet_diagnostic_enabled=entry.options.get(CONF_MAX_OUTLET_DIAGNOSTIC, False),
         debug_diagnostics_enabled=entry.options.get(CONF_DEBUG_DIAGNOSTICS, False),
+        efficiency_enabled=entry.options.get(CONF_EFFICIENCY, False),
     )
     device = KaisaiKhxDevice(connection.for_unit(entry.data.get(CONF_UNIT_ID, DEFAULT_UNIT_ID)), profile)
     coordinator = KaisaiCoordinator(hass, entry, connection, device, profile)
     entry.runtime_data = coordinator
     await coordinator.async_load_heat_curve()
+    await coordinator.async_load_efficiency()
     await coordinator.async_config_entry_first_refresh()
     entity_registry = er.async_get(hass)
     if old_heat_curve_switch := entity_registry.async_get_entity_id(
@@ -113,6 +117,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
         f"{entry.entry_id}_heat_curve_enabled",
     ):
         entity_registry.async_remove(old_heat_curve_switch)
+    if coordinator.efficiency is not None:
+        entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, coordinator.async_finish_efficiency))
     entry.async_on_unload(
         connection.on_connection_lost(lambda: hass.config_entries.async_schedule_reload(entry.entry_id))
     )
@@ -122,21 +128,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
 
 async def async_unload_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bool:
     await entry.runtime_data.async_flush_adaptive_learning()
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
+    await entry.runtime_data.async_finish_efficiency()
+    return True
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Remove persistent heat-curve and adaptive-learning data with the entry."""
-    if isinstance(runtime_data := entry.runtime_data, KaisaiCoordinator):
+    """Remove persisted control and efficiency data with the entry."""
+    if isinstance(runtime_data := getattr(entry, "runtime_data", None), KaisaiCoordinator):
         await runtime_data.async_remove_persistent_control_data()
-        return
+    else:
+        await Store[dict[str, object]](
+            hass,
+            HEAT_CURVE_STORAGE_VERSION,
+            heat_curve_storage_key(entry.entry_id),
+        ).async_remove()
+        await Store[dict[str, object]](
+            hass,
+            ADAPTIVE_STORAGE_VERSION,
+            adaptive_storage_key(entry.entry_id),
+        ).async_remove()
     await Store[dict[str, object]](
-        hass,
-        HEAT_CURVE_STORAGE_VERSION,
-        heat_curve_storage_key(entry.entry_id),
-    ).async_remove()
-    await Store[dict[str, object]](
-        hass,
-        ADAPTIVE_STORAGE_VERSION,
-        adaptive_storage_key(entry.entry_id),
+        hass, EFFICIENCY_STORAGE_VERSION, efficiency_storage_key(entry.entry_id)
     ).async_remove()

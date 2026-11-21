@@ -33,7 +33,8 @@
           "io_diagnostics_enabled": "Hardware input/output diagnostics",
           "max_outlet_diagnostic_enabled": "Maximum outlet-temperature diagnostic",
           "connection_diagnostics_enabled": "Connection diagnostics",
-          "debug_diagnostics_enabled": "Debug diagnostics"
+          "debug_diagnostics_enabled": "Debug diagnostics",
+          "efficiency_enabled": "Estimate COP and seasonal efficiency"
         },
         "data_description": {
           "control_enabled": "Turn off for monitoring-only operation.",
@@ -55,6 +56,18 @@
           "indoor_temperature_entity": "Optional. Used by Predictive + indoor compensation and required for Adaptive learning."
         }
       },
+      "efficiency": {
+        "title": "Estimate heating efficiency",
+        "description": "Use an electrical power sensor and the circulating flow rate of your heating water. The flow rate is used whenever the controller indicates circulation.",
+        "data": {
+          "efficiency_power_sensor": "Heat pump electrical power sensor",
+          "efficiency_flow_m3h": "Circulating water flow rate"
+        },
+        "data_description": {
+          "efficiency_power_sensor": "Select a sensor for the heat pump's electrical draw in W or kW.",
+          "efficiency_flow_m3h": "Use the flow measured while the pump is running, in m³/h. The calculation assumes water."
+        }
+      },
       "reconfigure": {
         "title": "Reconfigure KAISAI KHX",
         "description": "Enter the external Modbus TCP-to-RTU gateway connection. The KAISAI KHX itself has no built-in Modbus TCP.",
@@ -68,7 +81,9 @@
     },
     "error": {
       "cannot_connect": "Unable to communicate with the selected Modbus device.",
-      "unknown": "Unexpected error."
+      "unknown": "Unexpected error.",
+      "invalid_power_sensor": "Select an electrical power sensor that reports W or kW.",
+      "invalid_flow": "Enter a finite water flow rate of at least 0.01 m³/h."
     },
     "abort": {
       "already_configured": "This Modbus unit is already configured.",
@@ -80,7 +95,7 @@
     "step": {
       "init": {
         "title": "Choose features",
-        "description": "Enable or disable features after setup. Saving the next step reloads the integration and adds or removes the related entities. The selected model cannot be changed here.",
+        "description": "Enable or disable features after setup. Completing the options reloads the integration and updates the related entities. The selected model cannot be changed here.",
         "data": {
           "heating_enabled": "Heating",
           "cooling_enabled": "Cooling",
@@ -94,7 +109,8 @@
           "io_diagnostics_enabled": "Hardware input/output diagnostics",
           "max_outlet_diagnostic_enabled": "Maximum outlet-temperature diagnostic",
           "connection_diagnostics_enabled": "Connection diagnostics",
-          "debug_diagnostics_enabled": "Debug diagnostics"
+          "debug_diagnostics_enabled": "Debug diagnostics",
+          "efficiency_enabled": "Estimate COP and seasonal efficiency"
         },
         "data_description": {
           "control_enabled": "Turn off for monitoring-only operation.",
@@ -115,7 +131,23 @@
           "weather_entity": "Optional. Must support hourly forecasts for predictive modes.",
           "indoor_temperature_entity": "Optional. Used by Predictive + indoor compensation and required for Adaptive learning."
         }
+      },
+      "efficiency": {
+        "title": "Estimate heating efficiency",
+        "description": "Changing the power sensor or flow rate starts a new seasonal estimate.",
+        "data": {
+          "efficiency_power_sensor": "Heat pump electrical power sensor",
+          "efficiency_flow_m3h": "Circulating water flow rate"
+        },
+        "data_description": {
+          "efficiency_power_sensor": "Select a sensor for the heat pump's electrical draw in W or kW.",
+          "efficiency_flow_m3h": "Use the flow measured while the pump is running, in m³/h. The calculation assumes water."
+        }
       }
+    },
+    "error": {
+      "invalid_power_sensor": "Select an electrical power sensor that reports W or kW.",
+      "invalid_flow": "Enter a finite water flow rate of at least 0.01 m³/h."
     }
   },
   "entity": {
@@ -201,7 +233,9 @@
           "blending": "Blending",
           "active": "Active"
         }
-      }
+      },
+      "estimated_cop": {"name": "Estimated COP"},
+      "estimated_spf": {"name": "Estimated seasonal performance factor"}
     }
   },
   "exceptions": {

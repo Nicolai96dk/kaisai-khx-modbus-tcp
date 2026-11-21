@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 import logging
+from math import isfinite
 from typing import Any, override
 
 import voluptuous as vol
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
+from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
+    CONF_HOST,
+    CONF_NAME,
+    CONF_PORT,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     BooleanSelector,
     EntitySelector,
@@ -32,6 +42,9 @@ from .const import (
     CONF_CURRENT_TEMP_KEY,
     CONF_DEBUG_DIAGNOSTICS,
     CONF_DHW,
+    CONF_EFFICIENCY,
+    CONF_EFFICIENCY_FLOW,
+    CONF_EFFICIENCY_POWER_SENSOR,
     CONF_FAULT_MONITORING,
     CONF_HEATING,
     CONF_INDIVIDUAL_FAULTS,
@@ -56,6 +69,7 @@ from .const import (
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
 )
+from .efficiency import MIN_FLOW_M3H, POWER_UNITS
 from .models import KHX_09_PROFILE_ID, KHX_14_PROFILE_ID, KHX_16_PROFILE_ID
 from .profile import BUILTIN_PROFILE
 
@@ -82,6 +96,7 @@ FEATURE_DEFAULTS = {
     CONF_MAX_OUTLET_DIAGNOSTIC: False,
     CONF_CONNECTION_DIAGNOSTICS: True,
     CONF_DEBUG_DIAGNOSTICS: False,
+    CONF_EFFICIENCY: False,
 }
 
 
@@ -192,6 +207,42 @@ def _update_advanced_options(options: dict[str, Any], values: dict[str, Any]) ->
             options.pop(key, None)
 
 
+def efficiency_schema() -> vol.Schema:
+    """Select an electrical meter and enter the circulating flow rate."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_EFFICIENCY_POWER_SENSOR): EntitySelector(
+                EntitySelectorConfig(filter=[{"domain": "sensor", "unit_of_measurement": list(POWER_UNITS)}])
+            ),
+            vol.Required(CONF_EFFICIENCY_FLOW): NumberSelector(
+                NumberSelectorConfig(
+                    min=MIN_FLOW_M3H, step=0.01, mode=NumberSelectorMode.BOX, unit_of_measurement="m³/h"
+                )
+            ),
+        }
+    )
+
+
+def _validate_efficiency_input(hass: HomeAssistant, values: dict[str, Any]) -> dict[str, str]:
+    """Validate the selected meter and normalize a registry ID to an entity ID."""
+    errors = {}
+    source = er.async_resolve_entity_id(er.async_get(hass), values[CONF_EFFICIENCY_POWER_SENSOR])
+    if source is None or not source.startswith("sensor."):
+        errors[CONF_EFFICIENCY_POWER_SENSOR] = "invalid_power_sensor"
+    else:
+        values[CONF_EFFICIENCY_POWER_SENSOR] = source
+        power = hass.states.get(source)
+        if power is not None:
+            unit = power.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+            waiting_for_first_reading = unit is None and power.state in (STATE_UNKNOWN, STATE_UNAVAILABLE)
+            if unit not in POWER_UNITS and not waiting_for_first_reading:
+                errors[CONF_EFFICIENCY_POWER_SENSOR] = "invalid_power_sensor"
+    flow = values[CONF_EFFICIENCY_FLOW]
+    if not isfinite(flow) or flow < MIN_FLOW_M3H:
+        errors[CONF_EFFICIENCY_FLOW] = "invalid_flow"
+    return errors
+
+
 async def validate_connection(data: dict[str, Any]) -> str | None:
     """Perform one safe read before accepting a Modbus connection."""
     connection = None
@@ -272,10 +323,26 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
             if values[CONF_CURRENT_TEMP_KEY] not in allowed_sources:
                 values[CONF_CURRENT_TEMP_KEY] = DEFAULT_CURRENT_TEMP_KEY
             _update_advanced_options(self._setup_options, values)
+            if self._setup_options.get(CONF_EFFICIENCY, False):
+                return await self.async_step_efficiency()
             return self._async_finish_setup()
         return self.async_show_form(
             step_id="advanced",
             data_schema=advanced_schema(self._setup_options, dhw_enabled=dhw_enabled),
+        )
+
+    async def async_step_efficiency(self, user_input=None):
+        """Configure the optional efficiency calculation."""
+        errors = {}
+        if user_input is not None:
+            errors = _validate_efficiency_input(self.hass, user_input)
+            if not errors:
+                self._setup_options.update(user_input)
+                return self._async_finish_setup()
+        return self.async_show_form(
+            step_id="efficiency",
+            data_schema=self.add_suggested_values_to_schema(efficiency_schema(), user_input),
+            errors=errors,
         )
 
     def _async_finish_setup(self) -> ConfigFlowResult:
@@ -341,8 +408,26 @@ class KaisaiOptionsFlow(OptionsFlowWithReload):
             if values[CONF_CURRENT_TEMP_KEY] not in allowed_sources:
                 values[CONF_CURRENT_TEMP_KEY] = DEFAULT_CURRENT_TEMP_KEY
             _update_advanced_options(self._updated_options, values)
+            if self._updated_options.get(CONF_EFFICIENCY, False):
+                return await self.async_step_efficiency()
             return self.async_create_entry(data=self._updated_options)
         return self.async_show_form(
             step_id="advanced",
             data_schema=advanced_schema(self._updated_options, dhw_enabled=dhw_enabled),
+        )
+
+    async def async_step_efficiency(self, user_input=None):
+        """Edit calibration or the meter for efficiency tracking."""
+        errors = {}
+        if user_input is not None:
+            errors = _validate_efficiency_input(self.hass, user_input)
+            if not errors:
+                self._updated_options.update(user_input)
+                return self.async_create_entry(data=self._updated_options)
+        return self.async_show_form(
+            step_id="efficiency",
+            data_schema=self.add_suggested_values_to_schema(
+                efficiency_schema(), self._updated_options if user_input is None else user_input
+            ),
+            errors=errors,
         )

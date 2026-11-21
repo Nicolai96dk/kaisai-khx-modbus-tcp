@@ -4,7 +4,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "kaisai_khx"
 NAME = "Kaisai KHX Modbus TCP"
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 PLATFORMS = [
     Platform.BUTTON,
     Platform.CLIMATE,
@@ -35,6 +35,9 @@ CONF_IO_DIAGNOSTICS = "io_diagnostics_enabled"
 CONF_MAX_OUTLET_DIAGNOSTIC = "max_outlet_diagnostic_enabled"
 CONF_CONNECTION_DIAGNOSTICS = "connection_diagnostics_enabled"
 CONF_DEBUG_DIAGNOSTICS = "debug_diagnostics_enabled"
+CONF_EFFICIENCY = "efficiency_enabled"
+CONF_EFFICIENCY_POWER_SENSOR = "efficiency_power_sensor"
+CONF_EFFICIENCY_FLOW = "efficiency_flow_m3h"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_TIMEOUT = "timeout"
 CONF_MESSAGE_SPACING = "message_spacing"

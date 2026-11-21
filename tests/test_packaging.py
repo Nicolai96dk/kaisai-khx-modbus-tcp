@@ -37,6 +37,7 @@ def test_hacs_and_translation_metadata() -> None:
         "max_outlet_diagnostic_enabled",
         "connection_diagnostics_enabled",
         "debug_diagnostics_enabled",
+        "efficiency_enabled",
     }
     assert set(strings["options"]["step"]["advanced"]["data"]) == {
         "scan_interval",
@@ -44,6 +45,11 @@ def test_hacs_and_translation_metadata() -> None:
         "weather_entity",
         "indoor_temperature_entity",
     }
+    for flow_type in ("config", "options"):
+        assert set(strings[flow_type]["step"]["efficiency"]["data"]) == {
+            "efficiency_power_sensor",
+            "efficiency_flow_m3h",
+        }
     assert "active_fault" in strings["entity"]["sensor"]
     assert "fault" in strings["entity"]["binary_sensor"]
     assert "heat_curve" not in strings["entity"]["switch"]
@@ -132,8 +138,8 @@ def test_release_versions_match() -> None:
     manifest = json.loads((ROOT / "custom_components/kaisai_khx/manifest.json").read_text())
     const_source = (ROOT / "custom_components/kaisai_khx/const.py").read_text()
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text()
-    assert manifest["version"] == "0.6.0"
-    assert 'VERSION = "0.6.0"' in const_source
+    assert manifest["version"] == "0.7.0"
+    assert 'VERSION = "0.7.0"' in const_source
     assert '--title "${GITHUB_REF_NAME}"' in release_workflow
 
 

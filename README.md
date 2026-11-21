@@ -74,7 +74,7 @@ For a manual installation, copy `custom_components/kaisai_khx` into Home Assista
 
 Setup asks for the gateway connection, one of the three exact models, and the features to enable. On the first screen, **Gateway host/IP** is the address of the external RS485 gateway—not an address belonging to the heat pump. The port is the gateway's Modbus TCP listening port, normally `502`, and Unit ID is the KHX Modbus RTU slave address, normally `1`. Advanced options include the polling interval, the climate entity's current-temperature source, an optional Home Assistant weather entity for predictive control, and an optional indoor temperature sensor for indoor compensation. The climate source can be water inlet, water outlet (default), or DHW tank temperature when DHW is enabled.
 
-The feature page supports Heating, Cooling, optional DHW, monitoring-only operation, a separate power switch, actual power-state readback, fault monitoring, individual fault sensors, performance diagnostics, hardware input/output diagnostics, the read-only maximum outlet-temperature diagnostic, connection diagnostics, and **Debug diagnostics**. Debug diagnostics enables every applicable diagnostic entity for the selected model without expanding write access. Fan 2 remains model-controlled.
+The feature page supports Heating, Cooling, optional DHW, monitoring-only operation, a separate power switch, actual power-state readback, fault monitoring, individual fault sensors, performance diagnostics, hardware input/output diagnostics, the read-only maximum outlet-temperature diagnostic, connection diagnostics, **Debug diagnostics**, and optional COP and seasonal efficiency estimates. Debug diagnostics enables every applicable diagnostic entity for the selected model without expanding write access. Fan 2 remains model-controlled.
 
 ### RS485-to-Ethernet gateway
 
@@ -160,6 +160,19 @@ If an hourly forecast is unavailable, predictive control falls back to the KHX a
 The integration writes the calculated value only when an automatic mode is selected, the heat pump is powered on, and its operating mode is **Heating**. It writes again only when the rounded calculated target differs from the target read from the controller. Manual changes made while an automatic mode is enabled can therefore be replaced on the next update. Selecting **Manual** stops automatic writes and leaves the latest target unchanged.
 
 Forecasts are read through Home Assistant's standard `weather.get_forecasts` action with `type: hourly`; the integration never contacts MET.no or another forecast provider directly. MET.no supports hourly forecasts, but any Home Assistant weather entity providing hourly forecasts can be selected.
+
+### Estimated COP and seasonal efficiency
+
+Enable **Estimate COP and seasonal efficiency** during setup or from **Settings → Devices & services → Kaisai KHX → Configure**. Select an electrical power sensor in `W` or `kW` and enter the circulating water flow in `m³/h`. You can change either input from **Configure**. Use a sensor that measures the electrical draw of the heat pump and enter the flow through the heat pump while its circulation pump is running.
+
+- **Estimated COP** divides `1.16 × flow × (water outlet temperature − water inlet temperature)` by electrical input in kW. It is available during positive heat delivery with valid power and circulation readings.
+- **Estimated seasonal performance factor** divides net estimated thermal energy by electrical energy over the last 365 local calendar days, using the data collected so far. Heating, hot water and disinfection reported by the KHX are included. Defrost heat loss and electricity use during standby in a heating mode count toward the estimate. Intervals with unknown inputs or active cooling are skipped. The sensor attributes show the accumulated heat, electricity and observed hours.
+
+Enabling the feature also exposes **Water-flow switch** (active-low input 2034, bit 2) and **Main circulating water pump** (output 2019, bit 4). When both readings are available they must both indicate circulation. If only one is readable, the integration uses it. With neither readable, efficiency sampling pauses.
+
+The calculation assumes water and a constant configured flow while circulating. Changing either input starts a fresh seasonal estimate. Totals survive restarts, and the seasonal result is specific to the installation. The manufacturer’s SCOP uses standardized test conditions.
+
+### Faults and diagnostics
 
 Fault registers 2081, 2082, 2083, 2085–2090 are decoded into:
 

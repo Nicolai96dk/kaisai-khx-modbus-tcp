@@ -8,7 +8,7 @@ from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfFrequency, Uni
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import KaisaiConfigEntry
+from .coordinator import KaisaiConfigEntry, KaisaiCoordinator
 from .entity import KaisaiEntity, KaisaiLocalConfigEntity
 from .faults import raw_fault_registers
 
@@ -168,6 +168,13 @@ async def async_setup_entry(
                 AdaptiveLearningPhaseSensor(coordinator),
             ]
         )
+    if coordinator.efficiency is not None:
+        entities.extend(
+            (
+                KaisaiEfficiencySensor(coordinator, "estimated_cop"),
+                KaisaiEfficiencySensor(coordinator, "estimated_spf"),
+            )
+        )
     async_add_entities(entities)
 
 
@@ -314,3 +321,38 @@ class AdaptiveLearningPhaseSensor(KaisaiLocalConfigEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         return self.coordinator.heat_curve_learning_phase
+
+
+class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
+    """Instantaneous or rolling seasonal efficiency based on estimated heat output."""
+
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator: KaisaiCoordinator, key: str) -> None:
+        super().__init__(coordinator, key)
+        self._attr_translation_key = key
+        if key == "estimated_cop":
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def available(self) -> bool:
+        return self.native_value is not None and (self._key == "estimated_spf" or super().available)
+
+    @property
+    def native_value(self) -> float | None:
+        tracker = self.coordinator.efficiency
+        if tracker is None:
+            return None
+        return tracker.cop if self._key == "estimated_cop" else tracker.spf
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        tracker = self.coordinator.efficiency
+        if tracker is None or self._key != "estimated_spf":
+            return None
+        totals = tracker.totals
+        return {
+            "estimated_heat_kwh": round(totals.heat_kwh, 3),
+            "electrical_energy_kwh": round(totals.electricity_kwh, 3),
+            "observed_hours": round(totals.observed_hours, 2),
+        }

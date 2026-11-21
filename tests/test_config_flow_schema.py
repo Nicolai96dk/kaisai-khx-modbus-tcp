@@ -10,6 +10,7 @@ from homeassistant.helpers import config_validation as cv
 from custom_components.kaisai_khx.config_flow import (
     advanced_schema,
     connection_schema,
+    efficiency_schema,
     features_schema,
 )
 
@@ -36,7 +37,20 @@ def test_post_setup_feature_form_serializes_with_saved_values() -> None:
     assert "profile" not in fields
     assert fields["dhw_enabled"]["default"] is True
     assert fields["cooling_enabled"]["default"] is False
-    assert len(fields) == 13
+    assert fields["efficiency_enabled"]["default"] is False
+    assert len(fields) == 14
+
+
+def test_efficiency_form_accepts_external_sensor_and_fractional_flow() -> None:
+    """The same form can be rendered by the setup flow and options flow."""
+    schema = efficiency_schema()
+    serialized = voluptuous_serialize.convert(schema, custom_serializer=cv.custom_serializer)
+    assert serialized[0]["selector"]["entity"]["filter"] == [
+        {"domain": ["sensor"], "unit_of_measurement": ["W", "kW"]}
+    ]
+    assert serialized[1]["selector"]["number"]["unit_of_measurement"] == "m³/h"
+    values = {"efficiency_power_sensor": "sensor.meter_power", "efficiency_flow_m3h": 0.78}
+    assert schema(values) == values
 
 
 def test_post_setup_advanced_form_tracks_dhw_feature() -> None:
