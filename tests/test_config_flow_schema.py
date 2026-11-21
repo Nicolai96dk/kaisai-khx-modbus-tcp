@@ -13,6 +13,12 @@ from custom_components.kaisai_khx.config_flow import (
     efficiency_schema,
     features_schema,
 )
+from custom_components.kaisai_khx.models import (
+    GENERIC_PROFILE_ID,
+    KHX_09_PROFILE_ID,
+    KHX_14_PROFILE_ID,
+    KHX_16_PROFILE_ID,
+)
 
 
 def test_first_setup_form_serializes() -> None:
@@ -43,7 +49,7 @@ def test_post_setup_feature_form_serializes_with_saved_values() -> None:
 
 def test_efficiency_form_accepts_external_sensor_and_fractional_flow() -> None:
     """The same form can be rendered by the setup flow and options flow."""
-    schema = efficiency_schema()
+    schema = efficiency_schema(KHX_09_PROFILE_ID)
     serialized = voluptuous_serialize.convert(schema, custom_serializer=cv.custom_serializer)
     assert serialized[0]["selector"]["entity"]["filter"] == [
         {"domain": ["sensor"], "unit_of_measurement": ["W", "kW"]}
@@ -51,6 +57,33 @@ def test_efficiency_form_accepts_external_sensor_and_fractional_flow() -> None:
     assert serialized[1]["selector"]["number"]["unit_of_measurement"] == "m³/h"
     values = {"efficiency_power_sensor": "sensor.meter_power", "efficiency_flow_m3h": 0.78}
     assert schema(values) == values
+
+
+@pytest.mark.parametrize(
+    ("profile_id", "flow"),
+    ((KHX_09_PROFILE_ID, 1.0), (KHX_14_PROFILE_ID, 1.7), (KHX_16_PROFILE_ID, 2.9)),
+)
+def test_efficiency_form_defaults_to_model_reference_flow(profile_id: str, flow: float) -> None:
+    schema = efficiency_schema(profile_id)
+    fields = voluptuous_serialize.convert(schema, custom_serializer=cv.custom_serializer)
+
+    assert fields[1]["default"] == flow
+    assert schema({"efficiency_power_sensor": "sensor.meter_power"})["efficiency_flow_m3h"] == flow
+
+
+def test_efficiency_form_keeps_saved_flow() -> None:
+    schema = efficiency_schema(KHX_09_PROFILE_ID, saved_flow=0.78)
+    fields = voluptuous_serialize.convert(schema, custom_serializer=cv.custom_serializer)
+
+    assert fields[1]["default"] == 0.78
+
+
+def test_efficiency_form_requires_manual_flow_without_model_reference() -> None:
+    fields = voluptuous_serialize.convert(
+        efficiency_schema(GENERIC_PROFILE_ID), custom_serializer=cv.custom_serializer
+    )
+
+    assert "default" not in fields[1]
 
 
 def test_post_setup_advanced_form_tracks_dhw_feature() -> None:

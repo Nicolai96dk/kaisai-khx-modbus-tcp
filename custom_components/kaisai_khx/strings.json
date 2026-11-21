@@ -65,7 +65,7 @@
         },
         "data_description": {
           "efficiency_power_sensor": "Select a sensor for the heat pump's electrical draw in W or kW.",
-          "efficiency_flow_m3h": "Use the flow measured while the pump is running, in m³/h. The calculation assumes water."
+          "efficiency_flow_m3h": "The initial value is the model’s reference flow when available. If you know the measured flow in m³/h, enter it here. The calculation assumes water."
         }
       },
       "reconfigure": {
@@ -141,7 +141,7 @@
         },
         "data_description": {
           "efficiency_power_sensor": "Select a sensor for the heat pump's electrical draw in W or kW.",
-          "efficiency_flow_m3h": "Use the flow measured while the pump is running, in m³/h. The calculation assumes water."
+          "efficiency_flow_m3h": "Use the flow measured while the pump is running, in m³/h. When first enabled, the field starts with the model’s reference flow when available."
         }
       }
     },

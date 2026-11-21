@@ -163,7 +163,7 @@ Forecasts are read through Home Assistant's standard `weather.get_forecasts` act
 
 ### Estimated COP and seasonal efficiency
 
-Enable **Estimate COP and seasonal efficiency** during setup or from **Settings → Devices & services → Kaisai KHX → Configure**. Select an electrical power sensor in `W` or `kW` and enter the circulating water flow in `m³/h`. You can change either input from **Configure**. Use a sensor that measures the electrical draw of the heat pump and enter the flow through the heat pump while its circulation pump is running.
+Enable **Estimate COP and seasonal efficiency** during setup or from **Settings → Devices & services → Kaisai KHX → Configure**. Select an electrical power sensor in `W` or `kW`. The circulating water flow field starts with the selected model’s reference flow in `m³/h` when available. Enter the measured flow through the heat pump while its circulation pump is running if you know it. You can change either input from **Configure**.
 
 - **Estimated COP** divides `1.16 × flow × (water outlet temperature − water inlet temperature)` by electrical input in kW. It is available during positive heat delivery with valid power and circulation readings.
 - **Estimated seasonal performance factor** divides net estimated thermal energy by electrical energy over the last 365 local calendar days, using the data collected so far. Heating, hot water and disinfection reported by the KHX are included. Defrost heat loss and electricity use during standby in a heating mode count toward the estimate. Intervals with unknown inputs or active cooling are skipped. The sensor attributes show the accumulated heat, electricity and observed hours.

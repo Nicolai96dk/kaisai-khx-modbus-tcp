@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## 0.7.2 — 2026-11-21
+
+- Prefill the efficiency setup flow with the selected model’s reference flow rate.
+- Keep any saved flow rate when reopening Configure.
+
 ## 0.7.1 — 2026-11-21
 
 - Added optional estimated COP and rolling seasonal performance factor sensors.

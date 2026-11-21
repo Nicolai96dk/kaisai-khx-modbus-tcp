@@ -71,7 +71,7 @@ from .const import (
 )
 from .efficiency import MIN_FLOW_M3H, POWER_UNITS
 from .models import KHX_09_PROFILE_ID, KHX_14_PROFILE_ID, KHX_16_PROFILE_ID
-from .profile import BUILTIN_PROFILE
+from .profile import BUILTIN_PROFILE, get_builtin_profile
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -207,14 +207,17 @@ def _update_advanced_options(options: dict[str, Any], values: dict[str, Any]) ->
             options.pop(key, None)
 
 
-def efficiency_schema() -> vol.Schema:
+def efficiency_schema(profile_id: str, *, saved_flow: float | None = None) -> vol.Schema:
     """Select an electrical meter and enter the circulating flow rate."""
+    flow = saved_flow
+    if flow is None:
+        flow = get_builtin_profile(profile_id).capabilities.nominal_water_flow_m3h
     return vol.Schema(
         {
             vol.Required(CONF_EFFICIENCY_POWER_SENSOR): EntitySelector(
                 EntitySelectorConfig(filter=[{"domain": "sensor", "unit_of_measurement": list(POWER_UNITS)}])
             ),
-            vol.Required(CONF_EFFICIENCY_FLOW): NumberSelector(
+            vol.Required(CONF_EFFICIENCY_FLOW, default=flow if flow is not None else vol.UNDEFINED): NumberSelector(
                 NumberSelectorConfig(
                     min=MIN_FLOW_M3H, step=0.01, mode=NumberSelectorMode.BOX, unit_of_measurement="m³/h"
                 )
@@ -341,7 +344,9 @@ class KaisaiConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self._async_finish_setup()
         return self.async_show_form(
             step_id="efficiency",
-            data_schema=self.add_suggested_values_to_schema(efficiency_schema(), user_input),
+            data_schema=self.add_suggested_values_to_schema(
+                efficiency_schema(self._setup_data[CONF_PROFILE]), user_input
+            ),
             errors=errors,
         )
 
@@ -427,7 +432,11 @@ class KaisaiOptionsFlow(OptionsFlowWithReload):
         return self.async_show_form(
             step_id="efficiency",
             data_schema=self.add_suggested_values_to_schema(
-                efficiency_schema(), self._updated_options if user_input is None else user_input
+                efficiency_schema(
+                    self.config_entry.data.get(CONF_PROFILE, DEFAULT_PROFILE),
+                    saved_flow=self._updated_options.get(CONF_EFFICIENCY_FLOW),
+                ),
+                self._updated_options if user_input is None else user_input,
             ),
             errors=errors,
         )
