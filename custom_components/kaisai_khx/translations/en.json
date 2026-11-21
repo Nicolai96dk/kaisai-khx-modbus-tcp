@@ -234,9 +234,9 @@
           "active": "Active"
         }
       },
-      "estimated_cop": {"name": "COP"},
+      "estimated_cop": {"name": "Live COP"},
       "cop_status": {
-        "name": "COP status",
+        "name": "COP",
         "state": {
           "heating": "Heating",
           "no_flow": "No water flow",

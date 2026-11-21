@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 0.7.3 — 2026-11-21
+
+- Show live COP or its operating status in one COP row, with the last valid reading and timestamp in the details.
+- Keep the existing numeric COP entity and history under Diagnostics as Live COP.
+- Report SCOP to one decimal place on the device page.
+
 ## 0.7.2 — 2026-11-21
 
 - Prefill the efficiency setup flow with the selected model’s reference flow rate.

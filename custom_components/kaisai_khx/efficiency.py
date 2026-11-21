@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from enum import StrEnum
 from math import isfinite
 from typing import Any
@@ -84,6 +84,8 @@ class EfficiencyTracker:
     flow_m3h: float
     cop: float | None = field(init=False, default=None)
     cop_status: CopStatus = field(init=False, default=CopStatus.DATA_UNAVAILABLE)
+    last_cop: float | None = field(init=False, default=None)
+    last_cop_at: str | None = field(init=False, default=None)
     _previous: tuple[float, float, float] | None = field(init=False, default=None)
     _days: dict[date, EnergyTotals] = field(init=False, default_factory=dict)
     _last_day: date | None = field(init=False, default=None)
@@ -110,7 +112,7 @@ class EfficiencyTracker:
         self,
         now: float,
         *,
-        day: date,
+        observed_at: datetime,
         status: str | None,
         circulating: bool | None,
         heat_kw: float | None,
@@ -118,6 +120,7 @@ class EfficiencyTracker:
         max_gap_seconds: float,
     ) -> bool:
         """Record an instantaneous reading and return whether totals advanced."""
+        day = observed_at.date()
         self._advance_window(day)
         if status == "cooling":
             self.invalidate()
@@ -137,6 +140,8 @@ class EfficiencyTracker:
         else:
             self.cop_status = CopStatus.HEATING
             self.cop = heat_kw / power_kw
+            self.last_cop = self.cop
+            self.last_cop_at = observed_at.isoformat()
 
         previous = self._previous
         self._previous = (now, heat_kw, power_kw)
@@ -164,6 +169,8 @@ class EfficiencyTracker:
         """Resume totals for the same meter and flow calibration."""
         if not data or data.get("power_sensor") != self.power_sensor or data.get("flow_m3h") != self.flow_m3h:
             return
+        self.last_cop = _finite_number(data.get("last_cop"))
+        self.last_cop_at = data.get("last_cop_at")
         for day_key, values in data.get("days", {}).items():
             self._days[date.fromisoformat(day_key)] = EnergyTotals(
                 heat_kwh=values["heat_kwh"],
@@ -177,6 +184,8 @@ class EfficiencyTracker:
         return {
             "power_sensor": self.power_sensor,
             "flow_m3h": self.flow_m3h,
+            "last_cop": self.last_cop,
+            "last_cop_at": self.last_cop_at,
             "days": {
                 day.isoformat(): {
                     "heat_kwh": totals.heat_kwh,

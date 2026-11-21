@@ -174,7 +174,7 @@ async def async_setup_entry(
             (
                 KaisaiEfficiencySensor(coordinator, "estimated_cop"),
                 KaisaiEfficiencySensor(coordinator, "estimated_spf"),
-                KaisaiCopStatusSensor(coordinator),
+                KaisaiCopDisplaySensor(coordinator),
             )
         )
     async_add_entities(entities)
@@ -335,6 +335,7 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
         self._attr_translation_key = key
         if key == "estimated_cop":
             self._attr_state_class = SensorStateClass.MEASUREMENT
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def available(self) -> bool:
@@ -350,7 +351,11 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
         tracker = self.coordinator.efficiency
         if tracker is None:
             return None
-        return tracker.cop if self._key == "estimated_cop" else tracker.spf
+        if self._key == "estimated_cop":
+            return tracker.cop
+        # The device page displays a unitless seasonal ratio as stored.
+        spf = tracker.spf
+        return round(spf, 1) if spf is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -367,17 +372,25 @@ class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):
         }
 
 
-class KaisaiCopStatusSensor(KaisaiEntity, SensorEntity):
-    """Explain whether the integration can estimate an instantaneous COP."""
+class KaisaiCopDisplaySensor(KaisaiEntity, SensorEntity):
+    """Display the live COP or the reason no reading is available."""
 
     _attr_translation_key = "cop_status"
-    _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options: ClassVar[list[str]] = [status.value for status in CopStatus]
 
     def __init__(self, coordinator: KaisaiCoordinator) -> None:
+        # Reuse the former status entity so existing installations gain one COP row.
         super().__init__(coordinator, "cop_status")
 
     @property
     def native_value(self) -> str | None:
         tracker = self.coordinator.efficiency
-        return tracker.cop_status.value if tracker is not None else None
+        if tracker is None:
+            return None
+        return f"{tracker.cop:.1f}" if tracker.cop is not None else tracker.cop_status.value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        tracker = self.coordinator.efficiency
+        if tracker is None or tracker.cop is not None or tracker.last_cop is None:
+            return None
+        return {"last_cop": round(tracker.last_cop, 1), "last_cop_at": tracker.last_cop_at}
