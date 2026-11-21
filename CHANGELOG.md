@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## 0.7.0 — 2026-11-21
+## 0.7.1 — 2026-11-21
 
 - Added optional estimated COP and rolling seasonal performance factor sensors.
 - Added editable electrical power sensor and circulating water flow settings.
