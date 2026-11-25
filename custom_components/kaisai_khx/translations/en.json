@@ -235,7 +235,8 @@
         }
       },
       "estimated_cop": {"name": "COP"},
-      "estimated_spf": {"name": "SCOP"}
+      "estimated_spf": {"name": "SCOP"},
+      "estimated_heat_output": {"name": "Heat output"}
     }
   },
   "exceptions": {

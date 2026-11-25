@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfFrequency, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfFrequency, UnitOfPower, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -181,6 +181,7 @@ async def async_setup_entry(
             (
                 KaisaiEfficiencySensor(coordinator, "estimated_cop"),
                 KaisaiEfficiencySensor(coordinator, "estimated_spf"),
+                KaisaiHeatOutputSensor(coordinator),
             )
         )
     async_add_entities(entities)
@@ -329,6 +330,28 @@ class AdaptiveLearningPhaseSensor(KaisaiLocalConfigEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         return self.coordinator.heat_curve_learning_phase
+
+
+class KaisaiHeatOutputSensor(KaisaiEntity, SensorEntity):
+    """Estimated water-side thermal power."""
+
+    _attr_translation_key = "estimated_heat_output"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
+    _attr_suggested_unit_of_measurement = UnitOfPower.KILO_WATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator: KaisaiCoordinator) -> None:
+        super().__init__(coordinator, self._attr_translation_key)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+    @property
+    def native_value(self) -> float | None:
+        return (self.coordinator.data or {}).get(self._key)
 
 
 class KaisaiEfficiencySensor(KaisaiEntity, SensorEntity):

@@ -21,6 +21,8 @@ from .const import (
     CONF_DEBUG_DIAGNOSTICS,
     CONF_DHW,
     CONF_EFFICIENCY,
+    CONF_EFFICIENCY_FLOW,
+    CONF_EFFICIENCY_POWER_SENSOR,
     CONF_ELECTRICAL_PHASE,
     CONF_FAN_2,
     CONF_FAN_COUNT,
@@ -44,7 +46,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import KaisaiConfigEntry, KaisaiCoordinator
-from .efficiency import EFFICIENCY_STORAGE_VERSION, efficiency_storage_key
+from .efficiency import EFFICIENCY_STORAGE_VERSION, EfficiencyTracker, efficiency_storage_key
 from .heat_curve import HEAT_CURVE_STORAGE_VERSION, heat_curve_storage_key
 from .models import GENERIC_PROFILE_ID
 from .profile import get_builtin_profile, profile_for_capabilities, profile_with_overrides
@@ -87,6 +89,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
                 CONF_CURRENT_TEMP_KEY, DEFAULT_CURRENT_TEMP_KEY
             ),
         )
+    efficiency = None
+    if entry.options.get(CONF_EFFICIENCY, False):
+        efficiency = EfficiencyTracker.from_calibration(
+            entry.options.get(CONF_EFFICIENCY_POWER_SENSOR),
+            entry.options.get(CONF_EFFICIENCY_FLOW),
+        )
     profile = profile_for_capabilities(
         profile,
         dhw_enabled=entry.options.get(CONF_DHW, False),
@@ -102,13 +110,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: KaisaiConfigEntry) -> bo
         io_diagnostics_enabled=entry.options.get(CONF_IO_DIAGNOSTICS, False),
         max_outlet_diagnostic_enabled=entry.options.get(CONF_MAX_OUTLET_DIAGNOSTIC, False),
         debug_diagnostics_enabled=entry.options.get(CONF_DEBUG_DIAGNOSTICS, False),
-        efficiency_enabled=entry.options.get(CONF_EFFICIENCY, False),
+        efficiency_enabled=efficiency is not None,
     )
     device = KaisaiKhxDevice(connection.for_unit(entry.data.get(CONF_UNIT_ID, DEFAULT_UNIT_ID)), profile)
     coordinator = KaisaiCoordinator(hass, entry, connection, device, profile)
     entry.runtime_data = coordinator
     await coordinator.async_load_heat_curve()
-    await coordinator.async_load_efficiency()
+    if efficiency is not None:
+        await coordinator.async_load_efficiency(efficiency)
     await coordinator.async_config_entry_first_refresh()
     entity_registry = er.async_get(hass)
     if old_heat_curve_switch := entity_registry.async_get_entity_id(

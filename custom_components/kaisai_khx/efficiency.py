@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from math import isfinite
-from typing import Any
+from typing import Any, Self
 
 from .profile import CIRCULATION_BITS, BitDefinition
 
@@ -76,6 +76,16 @@ class EfficiencyTracker:
     _previous: tuple[float, float, float] | None = field(init=False, default=None)
     _days: dict[date, EnergyTotals] = field(init=False, default_factory=dict)
     _last_day: date | None = field(init=False, default=None)
+
+    @classmethod
+    def from_calibration(cls, power_sensor: object, flow_m3h: object) -> Self | None:
+        """Initialize only when the optional meter and flow are configured."""
+        if not isinstance(power_sensor, str) or not power_sensor.startswith("sensor.") or power_sensor == "sensor.":
+            return None
+        flow = _finite_number(flow_m3h)
+        if flow is None or flow < MIN_FLOW_M3H:
+            return None
+        return cls(power_sensor, flow)
 
     @property
     def totals(self) -> EnergyTotals:

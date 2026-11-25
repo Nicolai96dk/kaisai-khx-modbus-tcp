@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## 0.7.5 — 2026-11-25
+
+- Add estimated heat output in kW with one decimal place by default.
+- Show Heat output alongside COP and SCOP when an electrical power sensor and flow rate are configured.
+- Keep standard integration setup and polling available when efficiency options are incomplete.
+
 ## 0.7.4 — 2026-11-21
 
 - Use a single numeric COP sensor, retaining its existing entity ID and history.

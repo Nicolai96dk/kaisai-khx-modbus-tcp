@@ -40,9 +40,6 @@ from .const import (
     CONF_COOLING,
     CONF_DEBUG_DIAGNOSTICS,
     CONF_DHW,
-    CONF_EFFICIENCY,
-    CONF_EFFICIENCY_FLOW,
-    CONF_EFFICIENCY_POWER_SENSOR,
     CONF_FAULT_MONITORING,
     CONF_HEATING,
     CONF_INDIVIDUAL_FAULTS,
@@ -220,13 +217,10 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._adaptive_store.async_load()
         )
 
-    async def async_load_efficiency(self) -> None:
-        """Initialize the optional tracker before the first poll."""
-        options = self.config_entry.options
-        if options.get(CONF_EFFICIENCY, False):
-            tracker = EfficiencyTracker(options[CONF_EFFICIENCY_POWER_SENSOR], options[CONF_EFFICIENCY_FLOW])
-            tracker.restore(await self._efficiency_store.async_load(), dt_util.now().date())
-            self.efficiency = tracker
+    async def async_load_efficiency(self, tracker: EfficiencyTracker) -> None:
+        """Restore the configured tracker before the first poll."""
+        tracker.restore(await self._efficiency_store.async_load(), dt_util.now().date())
+        self.efficiency = tracker
 
     async def async_finish_efficiency(self, _event: Event | None = None) -> None:
         """Stop sampling and save the latest totals on unload or shutdown."""
@@ -247,12 +241,14 @@ class KaisaiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         now = time.monotonic()
         circulating = circulating_water(data, self.profile.bits)
+        heat_kw = heating_power_kw(data, tracker.flow_m3h, circulating)
+        data["estimated_heat_output"] = heat_kw
         advanced = tracker.sample(
             now,
             day=dt_util.now().date(),
             status=data.get("operation_status"),
             circulating=circulating,
-            heat_kw=heating_power_kw(data, tracker.flow_m3h, circulating),
+            heat_kw=heat_kw,
             power_kw=power_kw,
             max_gap_seconds=2 * self._global_interval,
         )

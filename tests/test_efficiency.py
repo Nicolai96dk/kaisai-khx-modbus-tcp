@@ -16,6 +16,11 @@ TODAY = date(2026, 11, 21)
 
 
 def test_efficiency_reads_circulation_without_enabling_all_diagnostics() -> None:
+    standard_profile = profile_for_capabilities(BUILTIN_PROFILE, dhw_enabled=False)
+    assert not standard_profile.bits
+    assert {"water_inlet_temperature", "water_outlet_temperature"} <= standard_profile.registers.keys()
+    assert {"input_states", "output_states"}.isdisjoint(standard_profile.registers)
+
     profile = profile_for_capabilities(BUILTIN_PROFILE, dhw_enabled=False, efficiency_enabled=True)
     assert {bit.key for bit in profile.bits} == {"water_flow_switch", "main_circulating_water_pump"}
     assert circulating_water({"input_states": 0, "output_states": 16}, profile.bits) is True
@@ -25,11 +30,36 @@ def test_efficiency_reads_circulation_without_enabling_all_diagnostics() -> None
     assert circulating_water({}, profile.bits) is None
 
 
+@pytest.mark.parametrize(
+    ("power_sensor", "flow"),
+    (
+        (None, 1.0),
+        ("", 1.0),
+        ("sensor.", 1.0),
+        ("switch.meter", 1.0),
+        ("sensor.power", None),
+        ("sensor.power", 0),
+        ("sensor.power", float("nan")),
+    ),
+)
+def test_incomplete_calibration_does_not_enable_efficiency(power_sensor: object, flow: object) -> None:
+    assert EfficiencyTracker.from_calibration(power_sensor, flow) is None
+
+
+def test_calibration_preserves_meter_and_flow() -> None:
+    tracker = EfficiencyTracker.from_calibration("sensor.power", 0.78)
+
+    assert tracker is not None
+    assert tracker.power_sensor == "sensor.power"
+    assert tracker.flow_m3h == 0.78
+
+
 def test_heat_output_uses_configured_flow_and_preserves_defrost_loss() -> None:
     data = {"water_inlet_temperature": 25.1, "water_outlet_temperature": 28.1}
     assert heating_power_kw(data, 1.0, True) == pytest.approx(3.48)
     assert heating_power_kw(data, 1.0, False) == 0
     assert heating_power_kw(data, 1.0, None) is None
+    assert heating_power_kw({"water_outlet_temperature": 28.1}, 1.0, True) is None
     assert heating_power_kw({**data, "water_outlet_temperature": 22.1}, 0.8, True) == pytest.approx(-2.784)
     assert electrical_power_kw("575", "W") == pytest.approx(0.575)
     assert electrical_power_kw("0.575", "kW") == pytest.approx(0.575)
